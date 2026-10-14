@@ -18,29 +18,31 @@ const {
   deleteCampaignAdmin,
   createOrganizationAdmin,
 } = require('../controllers/adminController');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, adminOnly, superAdminOnly, requirePermission } = require('../middleware/auth');
 
+// Every route needs a staff account; each action then needs its own permission.
 router.use(protect, adminOnly);
 
-router.get('/stats', getDashboardStats);
-router.get('/pending-posts', getPendingPosts);
-router.get('/users', getAllUsers);
-router.put('/users/:id/role', updateUserRole);
-router.put('/users/:id/verify', verifyMember);
-router.put('/users/:id/suspend', toggleUserSuspension);
-router.delete('/users/:id', deleteUser);
-router.get('/pending-blogs', getPendingBlogs);
+router.get('/stats', getDashboardStats); // finance figures are hidden without canViewDonations
+router.get('/pending-posts', requirePermission('canApprovePosts'), getPendingPosts);
+router.get('/pending-blogs', requirePermission('canApprovePosts'), getPendingBlogs);
 
-router.post('/organizations', createOrganizationAdmin);
+router.get('/users', requirePermission('canManageUsers'), getAllUsers);
+router.put('/users/:id/role', superAdminOnly, updateUserRole);
+router.put('/users/:id/verify', requirePermission('canManageUsers'), verifyMember);
+router.put('/users/:id/suspend', requirePermission('canManageUsers'), toggleUserSuspension);
+router.delete('/users/:id', requirePermission('canDeleteUsers'), deleteUser);
 
-router.get('/comments', getAllCommentsAdmin);
-router.delete('/comments/:id', deleteCommentAdmin);
+router.post('/organizations', requirePermission('canManageOrganizations'), createOrganizationAdmin);
 
-router.get('/donations', getAllDonationsAdmin);
-router.get('/expenses', getAllExpensesAdmin);
-router.delete('/expenses/:id', deleteExpenseAdmin);
+router.get('/comments', requirePermission('canDeletePosts'), getAllCommentsAdmin);
+router.delete('/comments/:id', requirePermission('canDeletePosts'), deleteCommentAdmin);
 
-router.put('/campaigns/:id', updateCampaignAdmin);
-router.delete('/campaigns/:id', deleteCampaignAdmin);
+router.get('/donations', requirePermission('canViewDonations'), getAllDonationsAdmin);
+router.get('/expenses', requirePermission('canViewDonations'), getAllExpensesAdmin);
+router.delete('/expenses/:id', requirePermission('canManageDonations'), deleteExpenseAdmin);
+
+router.put('/campaigns/:id', requirePermission('canManageDonations'), updateCampaignAdmin);
+router.delete('/campaigns/:id', requirePermission('canManageDonations'), deleteCampaignAdmin);
 
 module.exports = router;

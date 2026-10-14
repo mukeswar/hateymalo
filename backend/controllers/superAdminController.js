@@ -8,6 +8,7 @@ const AuditLog = require('../models/AuditLog');
 const PlatformSettings = require('../models/PlatformSettings');
 const Notification = require('../models/Notification');
 const { createAuditLog } = require('../utils/auditLogger');
+const { hasPermission, sanitizePermissions, PERMISSIONS, ROLE_PRESETS, effectivePermissions } = require('../utils/permissions');
 const { invalidateSettingsCache } = require('../utils/settingsCache');
 
 // @desc    Get Super Admin Recharts Analytics & Statistics
@@ -32,8 +33,12 @@ const getRechartsAnalytics = async (req, res) => {
     const upcomingEvents = await Event.countDocuments({ status: 'UPCOMING' });
     const publishedBlogs = await Blog.countDocuments({ status: 'APPROVED' });
 
-    const allDonations = await Donation.find().select('amount createdAt');
-    const totalDonationsAmount = allDonations.reduce((sum, d) => sum + d.amount, 0);
+    // Finance figures only go to staff who hold canViewDonations (moderators don't by default)
+    let totalDonationsAmount;
+    if (hasPermission(req.user, 'canViewDonations')) {
+      const allDonations = await Donation.find().select('amount');
+      totalDonationsAmount = allDonations.reduce((sum, d) => sum + d.amount, 0);
+    }
 
     // Monthly User Growth Aggregation for Recharts
     const userGrowth = await User.aggregate([
@@ -90,18 +95,22 @@ const getApprovalCenterItems = async (req, res) => {
   try {
     const { contentType = 'POSTS' } = req.query;
 
+    // Member emails are personal data — only staff who manage members see them
+    const canSeeEmails = hasPermission(req.user, 'canManageUsers');
+    const personFields = canSeeEmails ? 'name email profilePicture memberLevel' : 'name profilePicture memberLevel';
+
     let items = [];
     if (contentType === 'POSTS') {
       items = await Post.find({ status: 'PENDING' })
-        .populate('creator', 'name email profilePicture memberLevel')
+        .populate('creator', personFields)
         .sort({ createdAt: -1 });
     } else if (contentType === 'BLOGS') {
       items = await Blog.find({ status: 'PENDING' })
-        .populate('author', 'name email profilePicture')
+        .populate('author', personFields)
         .sort({ createdAt: -1 });
     } else if (contentType === 'ORGANIZATIONS') {
       items = await User.find({ memberLevel: 'ORGANIZATION', isVerified: false })
-        .select('-password')
+        .select(canSeeEmails ? '-password' : '-password -email -phone')
         .sort({ createdAt: -1 });
     }
 
@@ -209,7 +218,8 @@ const createStaffAccount = async (req, res) => {
       email,
       password,
       role,
-      permissions: Array.isArray(permissions) ? permissions : [],
+      // Nothing ticked → the role's default access (see utils/permissions.js)
+      permissions: sanitizePermissions(permissions).length ? sanitizePermissions(permissions) : ROLE_PRESETS[role],
       memberLevel: 'ADMIN',
       isVerified: true,
     });
@@ -239,6 +249,13 @@ const createStaffAccount = async (req, res) => {
   }
 };
 
+// @desc    Permission catalogue + role defaults, for the Admins & roles screen
+// @route   GET /api/super-admin/access-catalog
+// @access  Private/SuperAdmin
+const getAccessCatalog = (req, res) => {
+  res.json({ success: true, data: { permissions: PERMISSIONS, rolePresets: ROLE_PRESETS } });
+};
+
 // @desc    Update Staff Permissions (Super Admin only)
 // @route   PUT /api/super-admin/staff/:id/permissions
 // @access  Private/SuperAdmin
@@ -251,12 +268,18 @@ const updateStaffPermissions = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff user not found' });
     }
 
-    if (staff.role === 'SUPER_ADMIN' && req.user._id.toString() !== staff._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Cannot modify permissions of another Super Admin' });
+    // A Super Admin always has full access; their role cannot be changed here
+    // (this also stops the last Super Admin from accidentally locking themselves out).
+    if (staff.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Super Admin access cannot be changed' });
     }
 
     if (role && ['ADMIN', 'MODERATOR'].includes(role)) staff.role = role;
-    if (Array.isArray(permissions)) staff.permissions = permissions;
+    if (Array.isArray(permissions)) staff.permissions = sanitizePermissions(permissions);
+    if (['ADMIN', 'MODERATOR'].includes(staff.role)) {
+      staff.memberLevel = 'ADMIN';
+      staff.isVerified = true;
+    }
 
     await staff.save();
 
@@ -272,7 +295,14 @@ const updateStaffPermissions = async (req, res) => {
     res.json({
       success: true,
       message: 'Staff role and permissions updated',
-      data: staff,
+      data: {
+        _id: staff._id,
+        name: staff.name,
+        email: staff.email,
+        role: staff.role,
+        permissions: staff.permissions,
+        effectivePermissions: effectivePermissions(staff),
+      },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -289,9 +319,15 @@ const getPlatformSettings = async (req, res) => {
       settings = await PlatformSettings.create({});
     }
 
+    // Older installs stored a dummy QR and phone number as defaults. Never show
+    // those as real payment details — report them as "not configured" instead.
+    const data = settings.toObject();
+    if (/HAATEMALO-DONATION-OFFICIAL-QR/.test(data.paymentQrCode || '')) data.paymentQrCode = '';
+    if ((data.paymentPhone || '').replace(/\s/g, '') === '+9779800000000') data.paymentPhone = '';
+
     res.json({
       success: true,
-      data: settings,
+      data,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -330,9 +366,10 @@ const updatePlatformSettings = async (req, res) => {
     if (platformName) settings.platformName = platformName;
     if (tagline) settings.tagline = tagline;
     if (contactEmail) settings.contactEmail = contactEmail;
-    if (paymentQrCode) settings.paymentQrCode = paymentQrCode;
-    if (paymentInstructions) settings.paymentInstructions = paymentInstructions;
-    if (paymentPhone) settings.paymentPhone = paymentPhone;
+    // Optional fields may be cleared with an empty string (e.g. to unpublish a QR code)
+    if (paymentQrCode !== undefined) settings.paymentQrCode = paymentQrCode;
+    if (paymentInstructions !== undefined) settings.paymentInstructions = paymentInstructions;
+    if (paymentPhone !== undefined) settings.paymentPhone = paymentPhone;
     if (heroSmallLabel) settings.heroSmallLabel = heroSmallLabel;
     if (heroHeadline) settings.heroHeadline = heroHeadline;
     if (heroDescription) settings.heroDescription = heroDescription;
@@ -404,6 +441,7 @@ module.exports = {
   createStaffAccount,
   updateStaffPermissions,
   deleteStaffAccount,
+  getAccessCatalog,
   getPlatformSettings,
   updatePlatformSettings,
 };

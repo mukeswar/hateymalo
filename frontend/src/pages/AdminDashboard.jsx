@@ -1,35 +1,87 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import API from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import RejectionModal from '../components/RejectionModal';
 import VerificationBadge from '../components/VerificationBadge';
+import Avatar from '../components/ui/Avatar';
 import {
   ShieldAlert,
-  Users,
-  FileText,
-  Clock,
   CheckCircle2,
   AlertTriangle,
-  Grid,
-  Trash2,
   Check,
   X,
-  Plus,
-  MessageSquare,
-  Shield,
   Calendar,
   BookOpen,
-  DollarSign,
   Megaphone,
-  Sparkles,
   Send,
   BarChart3,
   UserX,
   UserCheck,
+  Clock,
+  ArrowUpRight,
+  Loader2,
+  Flag,
+  BadgeCheck,
+  Plus,
+  Trash2,
 } from 'lucide-react';
+
+/* ---------- Small local presentational helpers ---------- */
+
+const StatTile = ({ label, value, tone = 'text-ink', accent }) => (
+  <div className="card p-4 space-y-1 min-w-0">
+    <p className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1.5">
+      {accent && <span className={`w-1.5 h-1.5 rounded-full ${accent}`} aria-hidden="true" />}
+      {label}
+    </p>
+    <p className={`font-display text-2xl font-bold leading-tight truncate ${tone}`}>{value}</p>
+  </div>
+);
+
+const EmptyState = ({ title, text }) => (
+  <div className="card p-10 sm:p-12 text-center space-y-2">
+    <div className="w-14 h-14 rounded-full bg-pine-tint text-pine flex items-center justify-center mx-auto">
+      <CheckCircle2 className="w-7 h-7" aria-hidden="true" />
+    </div>
+    <p className="font-display text-xl font-bold text-ink pt-2">{title}</p>
+    {text && <p className="text-sm text-muted">{text}</p>}
+  </div>
+);
+
+const QueueSkeleton = () => (
+  <div className="space-y-3" aria-hidden="true">
+    {[0, 1, 2].map((i) => (
+      <div key={i} className="h-32 bg-paper-deep animate-pulse rounded-[var(--radius-card)]" />
+    ))}
+  </div>
+);
+
+// Destructive actions: brand outline that fills on hover.
+const dangerBtn =
+  'btn btn-sm min-h-10 bg-white text-brand border border-brand/40 hover:bg-brand hover:text-white hover:border-brand';
+// Stronger destructive (ban/suspend): solid brand.
+const dangerSolidBtn = 'btn btn-sm min-h-10 btn-primary';
+const positiveBtn = 'btn btn-sm min-h-10 btn-pine';
+const neutralBtn = 'btn btn-sm min-h-10 btn-ghost';
+
+// Each tab needs one staff permission (the server enforces the same rules)
+const TABS = [
+  { key: 'moderation', label: 'Pending posts', icon: Clock, countKey: 'pending', perm: 'canApprovePosts' },
+  { key: 'reports', label: 'Reports', icon: Flag, countKey: 'reports', perm: 'canManageReports' },
+  { key: 'blogs', label: 'Blogs', icon: BookOpen, countKey: 'blogs', perm: 'canApprovePosts' },
+  { key: 'verification', label: 'Members', icon: UserCheck, perm: 'canManageUsers' },
+  { key: 'events', label: 'Official event', icon: Calendar, perm: 'canManageEvents' },
+  { key: 'broadcast', label: 'Broadcast', icon: Megaphone, perm: 'canSendNotifications' },
+];
+
+const MEMBER_LEVELS = ['NEW MEMBER', 'TRUSTED MEMBER', 'VERIFIED MEMBER', 'ORGANIZATION', 'ADMIN'];
 
 const AdminDashboard = () => {
   const { showToast } = useToast();
+  const { can } = useAuth();
+  const visibleTabs = TABS.filter((t) => can(t.perm));
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -72,19 +124,22 @@ const AdminDashboard = () => {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
+      // Load only what this staff member may see; one refused request never blocks the rest
+      const skip = Promise.resolve(null);
+      const safe = (p) => p.catch(() => null);
       const [statsRes, pendingRes, usersRes, blogsRes, reportsRes] = await Promise.all([
-        API.get('/admin/stats'),
-        API.get('/admin/pending-posts'),
-        API.get('/admin/users'),
-        API.get('/admin/pending-blogs'),
-        API.get('/reports'),
+        safe(API.get('/admin/stats')),
+        can('canApprovePosts') ? safe(API.get('/admin/pending-posts')) : skip,
+        can('canManageUsers') ? safe(API.get('/admin/users')) : skip,
+        can('canApprovePosts') ? safe(API.get('/admin/pending-blogs')) : skip,
+        can('canManageReports') ? safe(API.get('/reports')) : skip,
       ]);
 
-      if (statsRes.data.success) setStats(statsRes.data.data);
-      if (pendingRes.data.success) setPendingQueue(pendingRes.data.data);
-      if (usersRes.data.success) setUsersList(usersRes.data.data);
-      if (blogsRes.data.success) setPendingBlogs(blogsRes.data.data);
-      if (reportsRes.data.success) setReportsList(reportsRes.data.data);
+      if (statsRes?.data.success) setStats(statsRes.data.data);
+      if (pendingRes?.data.success) setPendingQueue(pendingRes.data.data);
+      if (usersRes?.data.success) setUsersList(usersRes.data.data);
+      if (blogsRes?.data.success) setPendingBlogs(blogsRes.data.data);
+      if (reportsRes?.data.success) setReportsList(reportsRes.data.data);
     } catch (error) {
       showToast('Failed to load admin dashboard data', 'error');
     } finally {
@@ -95,6 +150,12 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  // Open the first section this staff member is allowed to use
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.key === activeTab) && visibleTabs.length > 0) setActiveTab(visibleTabs[0].key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, visibleTabs.length]);
 
   const handleApprove = async (postId) => {
     try {
@@ -225,382 +286,562 @@ const AdminDashboard = () => {
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* Admin Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
-            <ShieldAlert className="w-4 h-4" /> Platform Administration & Moderation Queue
-          </div>
-          <h1 className="text-3xl font-extrabold text-white mt-1">Admin Command Center</h1>
-          <p className="text-xs text-slate-400">Manage member verification levels, user suspensions, reported content, and platform analytics.</p>
-        </div>
-      </div>
+  const tabCounts = {
+    pending: pendingQueue.length,
+    reports: reportsList.length,
+    blogs: pendingBlogs.length,
+  };
 
-      {/* Stats Analytics Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-400 font-semibold uppercase">Pending Posts</p>
-          <p className="text-2xl font-black text-amber-300">{stats.pendingPosts}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-rose-500/30 bg-rose-950/10 space-y-1">
-          <p className="text-[10px] text-rose-400 font-semibold uppercase">Pending Reports</p>
-          <p className="text-2xl font-black text-rose-300">{stats.pendingReports || 0}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-400 font-semibold uppercase">Pending Blogs</p>
-          <p className="text-2xl font-black text-teal-300">{stats.pendingBlogs || 0}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-400 font-semibold uppercase">Upcoming Events</p>
-          <p className="text-2xl font-black text-sky-300">{stats.upcomingEvents || 0}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
-          <p className="text-[10px] text-emerald-400 font-semibold uppercase">Total Raised</p>
-          <p className="text-xl font-black text-emerald-300">NPR {stats.totalDonationsAmount || 0}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-sky-500/30 space-y-1">
-          <p className="text-[10px] text-sky-400 font-semibold uppercase">Verified Users</p>
-          <p className="text-2xl font-black text-sky-300">{stats.verifiedUsers || 0} / {stats.totalUsers}</p>
-        </div>
-      </div>
+  const formatNPR = (n) => `NPR ${Number(n || 0).toLocaleString('en-IN')}`;
 
-      {/* Category Distribution Bar Chart Visualization */}
-      {stats.categoryStats && stats.categoryStats.length > 0 && (
-        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
-            <BarChart3 className="w-4 h-4" /> Category Distribution Breakdown
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.categoryStats.map((c) => (
-              <div key={c._id} className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                <div className="flex justify-between text-xs font-bold">
-                  <span className="text-white">{c._id}</span>
-                  <span className="text-teal-300">{c.count} posts</span>
-                </div>
-                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full"
-                    style={{ width: `${Math.min(100, (c.count / Math.max(1, stats.totalPosts)) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+  const verificationToggle = (u) => (
+    <button
+      type="button"
+      onClick={() => handleUpdateVerification(u._id, u.memberLevel, !u.isVerified)}
+      aria-pressed={!!u.isVerified}
+      className={`btn btn-sm min-h-10 ${
+        u.isVerified
+          ? 'bg-pine-tint text-pine border border-pine/25 hover:bg-white hover:border-pine'
+          : 'btn-ghost'
+      }`}
+    >
+      {u.isVerified ? (
+        <>
+          <BadgeCheck className="w-4 h-4" aria-hidden="true" /> Verified badge active
+        </>
+      ) : (
+        <>
+          <Plus className="w-4 h-4" aria-hidden="true" /> Grant verification badge
+        </>
       )}
+    </button>
+  );
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-4 border-b border-slate-800 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('moderation')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'moderation' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <Clock className="w-4 h-4" /> Pending Posts ({pendingQueue.length})
-        </button>
+  const levelSelect = (u, id) => (
+    <select
+      id={id}
+      aria-label={`Member level for ${u.name}`}
+      value={u.memberLevel || 'NEW MEMBER'}
+      onChange={(e) => handleUpdateVerification(u._id, e.target.value, u.isVerified)}
+      className="field !py-2 !text-xs min-h-10 w-full sm:w-auto"
+    >
+      {MEMBER_LEVELS.map((lvl) => (
+        <option key={lvl} value={lvl}>
+          {lvl}
+        </option>
+      ))}
+    </select>
+  );
 
-        <button
-          onClick={() => setActiveTab('reports')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'reports' ? 'text-rose-400 border-rose-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4 text-rose-400" /> Moderation Queue ({reportsList.length})
-        </button>
+  const accountChip = (u) =>
+    u.isSuspended ? (
+      <span className="chip bg-brand-tint text-brand">Suspended</span>
+    ) : (
+      <span className="chip bg-pine-tint text-pine">Active</span>
+    );
 
-        <button
-          onClick={() => setActiveTab('blogs')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'blogs' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 text-teal-400" /> Blog Moderation ({pendingBlogs.length})
-        </button>
+  return (
+    <div className="h-full w-full overflow-y-auto bg-paper text-ink">
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-sand">
+        <div className="container-page flex items-center justify-between gap-3 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/logo-mark.png" alt="" className="w-9 h-9 object-contain shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-muted leading-tight truncate">
+                Hateymalo <span className="deva">· मोडरेसन</span>
+              </p>
+              <p className="font-display text-lg font-bold text-ink leading-tight truncate">Moderation desk</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {loading && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted" role="status">
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Refreshing
+              </span>
+            )}
+            <Link to="/" className="btn btn-ghost btn-sm min-h-10">
+              View site <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </header>
 
-        <button
-          onClick={() => setActiveTab('verification')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'verification' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <UserCheck className="w-4 h-4 text-sky-400" /> Member Verification Levels
-        </button>
+      <main className="container-page py-8 sm:py-10 space-y-8">
+        {/* Intro */}
+        <div className="space-y-2">
+          <span className="eyebrow">
+            <ShieldAlert className="w-4 h-4" aria-hidden="true" /> Platform administration
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-bold text-ink">Review & moderation</h1>
+          <p className="text-muted max-w-2xl">
+            Review submitted posts and blogs, resolve community reports, manage member verification, and publish
+            official events and announcements.
+          </p>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('events')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'events' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <Calendar className="w-4 h-4 text-sky-400" /> Official Event
-        </button>
+        {/* KPI tiles */}
+        <section aria-label="Platform statistics" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <StatTile label="Pending posts" value={stats.pendingPosts || 0} tone="text-marigold-text" accent="bg-marigold" />
+          <StatTile label="Pending reports" value={stats.pendingReports || 0} tone="text-brand" accent="bg-brand" />
+          <StatTile label="Pending blogs" value={stats.pendingBlogs || 0} accent="bg-marigold" />
+          <StatTile label="Upcoming events" value={stats.upcomingEvents || 0} tone="text-sky-ink" accent="bg-sky-ink" />
+          {can('canViewDonations') && (
+            <StatTile label="Total raised" value={formatNPR(stats.totalDonationsAmount)} tone="text-pine" accent="bg-pine" />
+          )}
+          <StatTile
+            label="Verified users"
+            value={`${stats.verifiedUsers || 0} / ${stats.totalUsers || 0}`}
+            tone="text-pine"
+            accent="bg-pine"
+          />
+        </section>
 
-        <button
-          onClick={() => setActiveTab('broadcast')}
-          className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
-            activeTab === 'broadcast' ? 'text-amber-400 border-amber-400' : 'text-slate-400 border-transparent hover:text-white'
-          }`}
-        >
-          <Megaphone className="w-4 h-4 text-amber-400" /> Broadcast
-        </button>
-      </div>
-
-      {/* TAB CONTENTS */}
-
-      {/* 1. Pending Posts */}
-      {activeTab === 'moderation' && (
-        <div className="space-y-4">
-          {pendingQueue.length > 0 ? (
-            <div className="space-y-4">
-              {pendingQueue.map((post) => (
-                <div key={post._id} className="glass-panel p-6 rounded-3xl border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
-                  <div className="space-y-2 max-w-2xl">
-                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-900 text-teal-300 border border-teal-500/30">
-                      {post.category}
-                    </span>
-                    <h3 className="text-xl font-bold text-white">{post.title}</h3>
-                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{post.description}</p>
-                    <p className="text-xs text-slate-400">Submitted by: {post.creator?.name} ({post.creator?.email})</p>
+        {/* Category distribution */}
+        {stats.categoryStats && stats.categoryStats.length > 0 && (
+          <section className="card p-5 sm:p-6 space-y-4" aria-labelledby="cat-dist-title">
+            <h2 id="cat-dist-title" className="text-lg font-bold text-ink flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-muted" aria-hidden="true" /> Posts by category
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+              {stats.categoryStats.map((c) => (
+                <div key={c._id} className="space-y-1.5 min-w-0">
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span className="font-semibold text-ink truncate">{c._id}</span>
+                    <span className="text-muted shrink-0">{c.count} posts</span>
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button onClick={() => handleApprove(post._id)} className="px-4 py-2.5 rounded-xl font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs flex items-center gap-1.5">
-                      <Check className="w-4 h-4" /> Approve & Publish
-                    </button>
-                    <button onClick={() => setRejectingPost(post)} className="px-4 py-2.5 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white text-xs flex items-center gap-1.5">
-                      <X className="w-4 h-4" /> Reject Post
-                    </button>
+                  <div className="progress-track">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${Math.min(100, (c.count / Math.max(1, stats.totalPosts)) * 100)}%` }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="glass-panel p-12 rounded-3xl text-center space-y-2">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <p className="text-lg font-bold text-white">All Caught Up!</p>
-              <p className="text-xs text-slate-400">No pending posts waiting for review.</p>
-            </div>
-          )}
-        </div>
-      )}
+          </section>
+        )}
 
-      {/* 2. Unified Content & User Moderation Reports Queue */}
-      {activeTab === 'reports' && (
-        <div className="space-y-4">
-          {reportsList.length > 0 ? (
-            <div className="space-y-4">
-              {reportsList.map((r) => (
-                <div key={r._id} className="glass-panel p-6 rounded-3xl border border-rose-500/40 bg-rose-950/10 space-y-4 shadow-xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-500/20 pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-rose-500 text-white">
-                        Reported {r.targetType}
+        {/* Tabs */}
+        <div className="border-b border-sand -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
+          <div role="tablist" aria-label="Admin sections" className="flex items-center gap-1 min-w-max">
+            {visibleTabs.map((t) => {
+              const Icon = t.icon;
+              const active = activeTab === t.key;
+              const count = t.countKey ? tabCounts[t.countKey] : null;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  id={`tab-${t.key}`}
+                  aria-selected={active}
+                  aria-controls={`panel-${t.key}`}
+                  onClick={() => setActiveTab(t.key)}
+                  className={`relative flex items-center gap-2 px-3 sm:px-4 min-h-11 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                    active ? 'text-brand border-brand' : 'text-muted border-transparent hover:text-ink'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" />
+                  {t.label}
+                  {count !== null && (
+                    <span
+                      className={`chip !px-2 !py-0 ${
+                        count > 0
+                          ? t.key === 'reports'
+                            ? 'bg-brand-tint text-brand'
+                            : 'bg-marigold-tint text-marigold-text'
+                          : 'bg-paper-deep text-muted'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 1. Pending posts */}
+        {activeTab === 'moderation' && (
+          <section role="tabpanel" id="panel-moderation" aria-labelledby="tab-moderation" className="space-y-3">
+            {loading && pendingQueue.length === 0 ? (
+              <QueueSkeleton />
+            ) : pendingQueue.length > 0 ? (
+              pendingQueue.map((post) => (
+                <article
+                  key={post._id}
+                  className="card p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5"
+                >
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="chip bg-marigold-tint text-marigold-text">
+                        <Clock className="w-3.5 h-3.5" aria-hidden="true" /> Pending review
                       </span>
-                      <span className="text-xs text-slate-400">By: {r.reporter?.name} ({r.reporter?.email})</span>
+                      {post.category && <span className="chip bg-sky-tint text-sky-ink">{post.category}</span>}
                     </div>
-                    <span className="text-xs text-rose-300 font-semibold">{new Date(r.createdAt).toLocaleDateString()}</span>
+                    <h3 className="text-xl font-bold text-ink break-words">{post.title}</h3>
+                    <p className="text-sm text-ink-soft line-clamp-2">{post.description}</p>
+                    <div className="flex items-center gap-2 pt-1 min-w-0">
+                      <Avatar name={post.creator?.name || ''} src={post.creator?.profilePicture} size="sm" />
+                      <p className="text-sm text-muted truncate">
+                        <span className="font-semibold text-ink-soft">{post.creator?.name}</span>
+                        {post.creator?.email && <> · {post.creator.email}</>}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <button type="button" onClick={() => handleApprove(post._id)} className={positiveBtn}>
+                      <Check className="w-4 h-4" aria-hidden="true" /> Approve & publish
+                    </button>
+                    <button type="button" onClick={() => setRejectingPost(post)} className={dangerBtn}>
+                      <X className="w-4 h-4" aria-hidden="true" /> Reject post
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState title="All caught up" text="No pending posts are waiting for review." />
+            )}
+          </section>
+        )}
+
+        {/* 2. Reports queue */}
+        {activeTab === 'reports' && (
+          <section role="tabpanel" id="panel-reports" aria-labelledby="tab-reports" className="space-y-3">
+            {loading && reportsList.length === 0 ? (
+              <QueueSkeleton />
+            ) : reportsList.length > 0 ? (
+              reportsList.map((r) => (
+                <article key={r._id} className="card p-5 sm:p-6 space-y-4 border-l-4 !border-l-brand">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="chip bg-brand-tint text-brand">
+                        <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Reported {r.targetType}
+                      </span>
+                      <span className="text-sm text-muted truncate">
+                        By <span className="font-semibold text-ink-soft">{r.reporter?.name}</span>
+                        {r.reporter?.email && <> · {r.reporter.email}</>}
+                      </span>
+                    </div>
+                    <time className="text-sm text-muted shrink-0" dateTime={r.createdAt}>
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </time>
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-rose-300">Reported Reason:</p>
-                    <p className="text-sm font-semibold text-white bg-slate-900 p-3 rounded-xl border border-slate-800">{r.reason}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">Reason</p>
+                    <p className="text-sm text-ink surface-sunken !rounded-xl p-3 break-words">{r.reason}</p>
                   </div>
 
                   {r.targetDoc && (
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
-                      <p className="text-slate-400 font-medium">Target Content Details:</p>
-                      <p className="font-bold text-white">{r.targetDoc.title || r.targetDoc.name || r.targetDoc.content}</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted">Reported content</p>
+                      <p className="text-sm font-semibold text-ink border border-sand rounded-xl p-3 break-words">
+                        {r.targetDoc.title || r.targetDoc.name || r.targetDoc.content}
+                      </p>
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-2 pt-2">
-                    <button onClick={() => handleResolveReport(r._id, 'DISMISS')} className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200">
-                      Dismiss Report
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 pt-1">
+                    <button type="button" onClick={() => handleResolveReport(r._id, 'DISMISS')} className={neutralBtn}>
+                      <Check className="w-4 h-4" aria-hidden="true" /> Dismiss report
                     </button>
-                    <button onClick={() => handleResolveReport(r._id, 'REMOVE_CONTENT')} className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white">
-                      Delete Content
-                    </button>
-                    <button onClick={() => handleResolveReport(r._id, 'SUSPEND_USER')} className="px-3.5 py-2 rounded-xl text-xs font-bold bg-red-900 hover:bg-red-800 text-rose-200 flex items-center gap-1">
-                      <UserX className="w-3.5 h-3.5" /> Suspend / Ban User
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="glass-panel p-12 rounded-3xl text-center space-y-2">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <p className="text-lg font-bold text-white">Clean Moderation Queue</p>
-              <p className="text-xs text-slate-400">No pending safety violation reports.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 3. Member Verification & Levels Manager */}
-      {activeTab === 'verification' && (
-        <div className="glass-panel rounded-3xl overflow-hidden border border-slate-800">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900 text-slate-400 font-bold uppercase border-b border-slate-800">
-              <tr>
-                <th className="p-4">User</th>
-                <th className="p-4">Member Level</th>
-                <th className="p-4">Verification Checkmark</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {usersList.map((u) => (
-                <tr key={u._id} className="hover:bg-slate-900/60">
-                  <td className="p-4">
-                    <p className="font-bold text-white flex items-center gap-1.5">
-                      {u.name} <VerificationBadge level={u.memberLevel} isVerified={u.isVerified} showLabel={false} />
-                    </p>
-                    <p className="text-[11px] text-slate-400">{u.email}</p>
-                  </td>
-                  <td className="p-4">
-                    <select
-                      value={u.memberLevel || 'NEW MEMBER'}
-                      onChange={(e) => handleUpdateVerification(u._id, e.target.value, u.isVerified)}
-                      className="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white outline-none"
-                    >
-                      <option value="NEW MEMBER">NEW MEMBER</option>
-                      <option value="TRUSTED MEMBER">TRUSTED MEMBER</option>
-                      <option value="VERIFIED MEMBER">VERIFIED MEMBER</option>
-                      <option value="ORGANIZATION">ORGANIZATION</option>
-                      <option value="ADMIN">ADMIN</option>
-                    </select>
-                  </td>
-                  <td className="p-4">
                     <button
-                      onClick={() => handleUpdateVerification(u._id, u.memberLevel, !u.isVerified)}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs ${
-                        u.isVerified
-                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
+                      type="button"
+                      onClick={() => handleResolveReport(r._id, 'REMOVE_CONTENT')}
+                      className={dangerBtn}
                     >
-                      {u.isVerified ? '✓ Verified Badge Active' : '+ Grant Verification Badge'}
+                      <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete content
                     </button>
-                  </td>
-                  <td className="p-4 text-right">
-                    {u.isSuspended ? (
-                      <span className="text-rose-400 font-bold">SUSPENDED</span>
-                    ) : (
-                      <span className="text-emerald-400 font-bold">ACTIVE</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    <button
+                      type="button"
+                      onClick={() => handleResolveReport(r._id, 'SUSPEND_USER')}
+                      className={dangerSolidBtn}
+                    >
+                      <UserX className="w-4 h-4" aria-hidden="true" /> Suspend / ban user
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState title="Report queue is clear" text="There are no pending safety reports." />
+            )}
+          </section>
+        )}
 
-      {/* 4. Blog Moderation */}
-      {activeTab === 'blogs' && (
-        <div className="space-y-4">
-          {pendingBlogs.length > 0 ? (
-            <div className="space-y-4">
-              {pendingBlogs.map((b) => (
-                <div key={b._id} className="glass-panel p-6 rounded-3xl border border-teal-500/30 space-y-3 shadow-xl">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-slate-700">
-                        {b.category}
-                      </span>
-                      <h3 className="text-xl font-bold text-white mt-1">{b.title}</h3>
-                      <p className="text-xs text-slate-400">Author: {b.author?.name} ({b.author?.email})</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleBlogApprove(b._id)} className="px-4 py-2 rounded-xl font-bold bg-emerald-500 text-slate-950 text-xs">
-                        Approve Blog
-                      </button>
-                      <button onClick={() => handleBlogReject(b._id)} className="px-4 py-2 rounded-xl font-bold bg-rose-600 text-white text-xs">
-                        Reject Blog
-                      </button>
-                    </div>
+        {/* 3. Member verification */}
+        {activeTab === 'verification' && (
+          <section role="tabpanel" id="panel-verification" aria-labelledby="tab-verification">
+            {loading && usersList.length === 0 ? (
+              <QueueSkeleton />
+            ) : usersList.length === 0 ? (
+              <EmptyState title="No members yet" text="Registered members will appear here." />
+            ) : (
+              <>
+                {/* Desktop table */}
+                <div className="card overflow-hidden hidden md:block">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-paper text-xs uppercase tracking-wider text-muted border-b border-sand">
+                        <tr>
+                          <th scope="col" className="px-5 py-3 font-semibold">Member</th>
+                          <th scope="col" className="px-5 py-3 font-semibold">Member level</th>
+                          <th scope="col" className="px-5 py-3 font-semibold">Verification</th>
+                          <th scope="col" className="px-5 py-3 font-semibold text-right">Account</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-sand">
+                        {usersList.map((u) => (
+                          <tr key={u._id} className="hover:bg-paper/70 transition-colors">
+                            <td className="px-5 py-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <Avatar name={u.name || ''} src={u.profilePicture} size="md" />
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-ink flex items-center gap-1.5">
+                                    <span className="truncate">{u.name}</span>
+                                    <VerificationBadge level={u.memberLevel} isVerified={u.isVerified} showLabel={false} />
+                                  </p>
+                                  <p className="text-xs text-muted truncate">{u.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3">{levelSelect(u, `level-${u._id}`)}</td>
+                            <td className="px-5 py-3">{verificationToggle(u)}</td>
+                            <td className="px-5 py-3 text-right">{accountChip(u)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="glass-panel p-12 rounded-3xl text-center space-y-2">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <p className="text-lg font-bold text-white">No Pending Blogs</p>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* 5. Official Events Form */}
-      {activeTab === 'events' && (
-        <form onSubmit={handleCreateEvent} className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl max-w-3xl mx-auto">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-sky-400" /> Create Official Community Event
-          </h3>
+                {/* Mobile stacked cards */}
+                <ul className="md:hidden space-y-3">
+                  {usersList.map((u) => (
+                    <li key={u._id} className="card p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar name={u.name || ''} src={u.profilePicture} size="md" />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-ink flex items-center gap-1.5">
+                              <span className="truncate">{u.name}</span>
+                              <VerificationBadge level={u.memberLevel} isVerified={u.isVerified} showLabel={false} />
+                            </p>
+                            <p className="text-xs text-muted truncate">{u.email}</p>
+                          </div>
+                        </div>
+                        {accountChip(u)}
+                      </div>
+                      <div>
+                        <label htmlFor={`level-m-${u._id}`} className="field-label !text-xs">
+                          Member level
+                        </label>
+                        {levelSelect(u, `level-m-${u._id}`)}
+                      </div>
+                      <div className="[&>button]:w-full">{verificationToggle(u)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Event Title *</label>
-              <input type="text" required value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} placeholder="e.g., Annual Kathmandu Clean River Summit 2026" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
-            </div>
+        {/* 4. Blog moderation */}
+        {activeTab === 'blogs' && (
+          <section role="tabpanel" id="panel-blogs" aria-labelledby="tab-blogs" className="space-y-3">
+            {loading && pendingBlogs.length === 0 ? (
+              <QueueSkeleton />
+            ) : pendingBlogs.length > 0 ? (
+              pendingBlogs.map((b) => (
+                <article
+                  key={b._id}
+                  className="card p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5"
+                >
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="chip bg-marigold-tint text-marigold-text">
+                        <Clock className="w-3.5 h-3.5" aria-hidden="true" /> Pending review
+                      </span>
+                      {b.category && <span className="chip bg-sky-tint text-sky-ink">{b.category}</span>}
+                    </div>
+                    <h3 className="text-xl font-bold text-ink break-words">{b.title}</h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar name={b.author?.name || ''} src={b.author?.profilePicture} size="sm" />
+                      <p className="text-sm text-muted truncate">
+                        <span className="font-semibold text-ink-soft">{b.author?.name}</span>
+                        {b.author?.email && <> · {b.author.email}</>}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <button type="button" onClick={() => handleBlogApprove(b._id)} className={positiveBtn}>
+                      <Check className="w-4 h-4" aria-hidden="true" /> Approve blog
+                    </button>
+                    <button type="button" onClick={() => handleBlogReject(b._id)} className={dangerBtn}>
+                      <X className="w-4 h-4" aria-hidden="true" /> Reject blog
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState title="No pending blogs" text="New blog submissions will appear here for review." />
+            )}
+          </section>
+        )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Description *</label>
-              <textarea rows={4} required value={eventDesc} onChange={(e) => setEventDesc(e.target.value)} placeholder="Event goals, agenda, meeting location details..." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Location *</label>
-                <input type="text" required value={eventLoc} onChange={(e) => setEventLoc(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
+        {/* 5. Official event form */}
+        {activeTab === 'events' && (
+          <section role="tabpanel" id="panel-events" aria-labelledby="tab-events">
+            <form onSubmit={handleCreateEvent} className="card p-5 sm:p-8 space-y-6 max-w-3xl mx-auto">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-tint text-sky-ink flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-ink">Create an official community event</h2>
+                  <p className="text-sm text-muted">Published events are listed publicly on the Events page.</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Date *</label>
-                <input type="date" required value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="ev-title" className="field-label">
+                    Event title <span className="text-brand">*</span>
+                  </label>
+                  <input
+                    id="ev-title"
+                    type="text"
+                    required
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                    placeholder="e.g., Annual Kathmandu Clean River Summit 2026"
+                    className="field"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="ev-desc" className="field-label">
+                    Description <span className="text-brand">*</span>
+                  </label>
+                  <textarea
+                    id="ev-desc"
+                    rows={4}
+                    required
+                    value={eventDesc}
+                    onChange={(e) => setEventDesc(e.target.value)}
+                    placeholder="Event goals, agenda, meeting location details..."
+                    className="field"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="ev-loc" className="field-label">
+                      Location <span className="text-brand">*</span>
+                    </label>
+                    <input
+                      id="ev-loc"
+                      type="text"
+                      required
+                      value={eventLoc}
+                      onChange={(e) => setEventLoc(e.target.value)}
+                      className="field"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ev-date" className="field-label">
+                      Date <span className="text-brand">*</span>
+                    </label>
+                    <input
+                      id="ev-date"
+                      type="date"
+                      required
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="field"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ev-max" className="field-label">
+                      Max participants
+                    </label>
+                    <input
+                      id="ev-max"
+                      type="number"
+                      min={10}
+                      value={eventMaxPart}
+                      onChange={(e) => setEventMaxPart(e.target.value)}
+                      className="field"
+                    />
+                    <p className="text-xs text-muted mt-1">Minimum 10.</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Max Participants</label>
-                <input type="number" min={10} value={eventMaxPart} onChange={(e) => setEventMaxPart(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
+
+              <button type="submit" className="btn btn-pine w-full sm:w-auto">
+                <Calendar className="w-4 h-4" aria-hidden="true" /> Publish official event
+              </button>
+            </form>
+          </section>
+        )}
+
+        {/* 6. Broadcast announcement */}
+        {activeTab === 'broadcast' && (
+          <section role="tabpanel" id="panel-broadcast" aria-labelledby="tab-broadcast">
+            <form onSubmit={handleCreateAnnouncement} className="card p-5 sm:p-8 space-y-6 max-w-3xl mx-auto">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-marigold-tint text-marigold-text flex items-center justify-center shrink-0">
+                  <Megaphone className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-ink">Broadcast a platform announcement</h2>
+                  <p className="text-sm text-muted">Announcements are shown to the whole community.</p>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <button type="submit" className="w-full py-3.5 rounded-2xl font-bold bg-teal-500 text-slate-950 shadow-xl text-sm">
-            Publish Official Event
-          </button>
-        </form>
-      )}
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="ann-title" className="field-label">
+                    Announcement title <span className="text-brand">*</span>
+                  </label>
+                  <input
+                    id="ann-title"
+                    type="text"
+                    required
+                    value={annTitle}
+                    onChange={(e) => setAnnTitle(e.target.value)}
+                    placeholder="e.g. Platform Maintenance Notice / Emergency Flood Relief Call"
+                    className="field"
+                  />
+                </div>
 
-      {/* 6. Broadcast Announcement */}
-      {activeTab === 'broadcast' && (
-        <form onSubmit={handleCreateAnnouncement} className="glass-panel p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-amber-950/10 space-y-6 shadow-2xl max-w-3xl mx-auto">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Megaphone className="w-5 h-5 text-amber-400" /> Broadcast Platform Announcement
-          </h3>
+                <div>
+                  <label htmlFor="ann-content" className="field-label">
+                    Message <span className="text-brand">*</span>
+                  </label>
+                  <textarea
+                    id="ann-content"
+                    rows={4}
+                    required
+                    value={annContent}
+                    onChange={(e) => setAnnContent(e.target.value)}
+                    placeholder="Message content..."
+                    className="field"
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-amber-300 uppercase mb-1">Announcement Title *</label>
-              <input type="text" required value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="e.g. Platform Maintenance Notice / Emergency Flood Relief Call" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-amber-300 uppercase mb-1">Announcement Message *</label>
-              <textarea rows={4} required value={annContent} onChange={(e) => setAnnContent(e.target.value)} placeholder="Message content..." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none" />
-            </div>
-          </div>
-
-          <button type="submit" className="w-full py-3.5 rounded-2xl font-bold bg-amber-500 text-slate-950 shadow-xl text-sm flex items-center justify-center gap-2">
-            <Send className="w-4 h-4" /> Broadcast Announcement to Community
-          </button>
-        </form>
-      )}
+              <button type="submit" className="btn btn-primary w-full sm:w-auto">
+                <Send className="w-4 h-4" aria-hidden="true" /> Broadcast to community
+              </button>
+            </form>
+          </section>
+        )}
+      </main>
 
       {/* Admin Rejection Modal */}
       {rejectingPost && (
@@ -611,7 +852,6 @@ const AdminDashboard = () => {
           postTitle={rejectingPost.title}
         />
       )}
-
     </div>
   );
 };

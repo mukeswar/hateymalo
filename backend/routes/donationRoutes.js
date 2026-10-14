@@ -7,13 +7,13 @@ const {
   getFinancialTransparency,
   addExpenseRecord,
 } = require('../controllers/donationController');
-const { protect } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 router.post('/', protect, submitDonation);
 
 router.route('/campaigns')
   .get(getDonationCampaigns)
-  .post(protect, createDonationCampaign);
+  .post(protect, requirePermission('canManageDonations'), createDonationCampaign);
 
 router.get('/campaigns/:id/transparency', getFinancialTransparency);
 router.post('/campaigns/:id/expenses', protect, addExpenseRecord);

@@ -4,17 +4,34 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const rateLimiter = require('./middleware/rateLimiter');
 
-dotenv.config();
+// Always read backend/.env, whichever folder the server is started from
+// (on Vercel there is no .env file; variables come from the project settings)
+dotenv.config({ path: require('path').join(__dirname, '.env') });
 
 const app = express();
 
+// Behind Vercel's proxy, use X-Forwarded-For so req.ip (rate limiter, audit log) is the real client
+app.set('trust proxy', 1);
+
 // Connect Database
-connectDB();
+connectDB().catch(() => {});
 
 // Middleware
 app.use(cors());
+
+// Wait for the DB on each request so serverless cold starts don't run queries before connecting
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') return next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(503).json({ success: false, message: 'Database unavailable. Please try again shortly.' });
+  }
+});
 app.use(express.json());
 app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 10000 }));
+app.use(require('./middleware/auditTrail'));
 
 // Mount Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -41,7 +58,7 @@ app.get('/api/stats', getPublicStats);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    platform: 'हातेमालो (HAATEMALO)',
+    platform: 'हातेमालो (HATEYMALO)',
     timestamp: new Date().toISOString(),
   });
 });
@@ -57,9 +74,13 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`  HAATEMALO Server running on port ${PORT}`);
-  console.log(`  Health check: http://localhost:${PORT}/api/health`);
-  console.log(`====================================================`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`  HATEYMALO Server running on port ${PORT}`);
+    console.log(`  Health check: http://localhost:${PORT}/api/health`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = app;

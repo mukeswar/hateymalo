@@ -8,6 +8,7 @@ const Donation = require('../models/Donation');
 const DonationCampaign = require('../models/DonationCampaign');
 const Announcement = require('../models/Announcement');
 const Report = require('../models/Report');
+const { hasPermission } = require('../utils/permissions');
 
 // @desc    Get admin dashboard statistics (Phases 1, 2, 3, 4)
 // @route   GET /api/admin/stats
@@ -27,8 +28,12 @@ const getDashboardStats = async (req, res) => {
 
     const pendingBlogs = await Blog.countDocuments({ status: 'PENDING' });
     
-    const allDonations = await Donation.find().select('amount');
-    const totalDonationsAmount = allDonations.reduce((sum, d) => sum + d.amount, 0);
+    // Finance figures only go to staff who hold canViewDonations (moderators don't by default)
+    let totalDonationsAmount;
+    if (hasPermission(req.user, 'canViewDonations')) {
+      const allDonations = await Donation.find().select('amount');
+      totalDonationsAmount = allDonations.reduce((sum, d) => sum + d.amount, 0);
+    }
 
     const activeCampaigns = await DonationCampaign.countDocuments({ status: 'ACTIVE' });
     const recentAnnouncements = await Announcement.countDocuments();
@@ -352,10 +357,13 @@ const createOrganizationAdmin = async (req, res) => {
       },
     });
 
+    // Never send the password hash back to the client
+    const { password: _omit, ...orgData } = org.toObject();
+
     res.status(201).json({
       success: true,
       message: `Organization "${name}" registered successfully!`,
-      data: org,
+      data: orgData,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

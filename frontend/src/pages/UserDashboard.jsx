@@ -6,6 +6,8 @@ import PostCard from '../components/PostCard';
 import BadgeList from '../components/BadgeList';
 import VerificationBadge from '../components/VerificationBadge';
 import EditProfileModal from '../components/EditProfileModal';
+import ChangePasswordCard from '../components/ChangePasswordCard';
+import Avatar from '../components/ui/Avatar';
 import {
   FileText,
   Heart,
@@ -14,22 +16,57 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  Award,
-  Sparkles,
-  BookOpen,
-  Calendar,
-  Wallet,
   ShieldAlert,
+  ShieldCheck,
   ArrowRight,
-  Edit2,
-  PlusCircle,
+  PenLine,
+  Plus,
   Compass,
-  Zap,
-  TrendingUp,
   MapPin,
   Mail,
-  ShieldCheck,
+  Hourglass,
+  User,
+  CalendarDays,
 } from 'lucide-react';
+
+const STATUS_STYLES = {
+  PENDING: { label: 'Pending review', cls: 'bg-marigold-tint text-marigold-text', icon: Hourglass },
+  APPROVED: { label: 'Approved', cls: 'bg-pine-tint text-pine', icon: CheckCircle2 },
+  COMPLETED: { label: 'Completed', cls: 'bg-pine-tint text-pine', icon: CheckCircle2 },
+  REJECTED: { label: 'Not approved', cls: 'bg-brand-tint text-brand', icon: AlertTriangle },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-brand-tint text-brand', icon: AlertTriangle },
+  DRAFT: { label: 'Draft', cls: 'bg-sky-tint text-sky-ink', icon: PenLine },
+  HIDDEN: { label: 'Hidden', cls: 'bg-paper-deep text-ink-soft', icon: Clock },
+  ARCHIVED: { label: 'Archived', cls: 'bg-paper-deep text-ink-soft', icon: Clock },
+};
+
+const StatusChip = ({ status }) => {
+  const s = STATUS_STYLES[status] || { label: status || 'Unknown', cls: 'bg-sky-tint text-sky-ink', icon: Clock };
+  const Icon = s.icon;
+  return (
+    <span className={`chip ${s.cls}`}>
+      <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {s.label}
+    </span>
+  );
+};
+
+const greetingFor = (date = new Date()) => {
+  const h = date.getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const EmptyState = ({ icon: Icon, title, text, action }) => (
+  <div className="card p-10 sm:p-14 text-center">
+    <span className="w-14 h-14 mx-auto rounded-full bg-paper-deep text-ink-soft flex items-center justify-center">
+      <Icon className="w-6 h-6" aria-hidden="true" />
+    </span>
+    <h3 className="mt-4 text-xl font-semibold text-ink">{title}</h3>
+    <p className="mt-1 text-muted max-w-md mx-auto">{text}</p>
+    {action && <div className="mt-6">{action}</div>}
+  </div>
+);
 
 const UserDashboard = () => {
   const { user, isAdmin } = useAuth();
@@ -77,387 +114,298 @@ const UserDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
-        <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#C8382C] to-amber-500 animate-spin flex items-center justify-center p-1 shadow-lg">
-            <div className="w-full h-full bg-white rounded-xl"></div>
-          </div>
-          <Zap className="w-6 h-6 text-[#C8382C] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      <div className="container-page pt-10 sm:pt-14 pb-16" aria-busy="true" aria-label="Loading your dashboard">
+        <div className="h-8 w-48 bg-paper-deep animate-pulse rounded-full" />
+        <div className="mt-4 h-12 w-80 max-w-full bg-paper-deep animate-pulse rounded-2xl" />
+        <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-paper-deep animate-pulse rounded-[var(--radius-card)]" />
+          ))}
         </div>
-        <p className="text-xs font-bold text-slate-500 tracking-wider uppercase animate-pulse">Loading Your Dashboard...</p>
+        <div className="mt-8 h-64 bg-paper-deep animate-pulse rounded-[var(--radius-card)]" />
       </div>
     );
   }
 
   const approvedPosts = myPosts.filter((p) => p.status === 'APPROVED');
-  const totalPeopleHelped = joinedActivities.length * 5 + approvedPosts.length * 10;
+  const pendingPosts = myPosts.filter((p) => p.status === 'PENDING');
+  const rejectedPosts = myPosts.filter((p) => p.status === 'REJECTED');
+  const firstName = user.name?.split(' ')[0] || 'friend';
+
+  const stats = [
+    { label: 'Posts created', value: myPosts.length, icon: FileText, tone: 'bg-brand-tint text-brand' },
+    { label: 'Approved & public', value: approvedPosts.length, icon: CheckCircle2, tone: 'bg-pine-tint text-pine' },
+    { label: 'Drives joined', value: joinedActivities.length, icon: UserCheck, tone: 'bg-sky-tint text-sky-ink' },
+    { label: 'Saved / interested', value: interestedPosts.length, icon: Heart, tone: 'bg-marigold-tint text-marigold-text' },
+  ];
+
+  const tabs = [
+    { id: 'my-posts', label: 'My posts', icon: FileText, count: myPosts.length },
+    { id: 'joined', label: 'Joined drives', icon: UserCheck, count: joinedActivities.length },
+    { id: 'interested', label: 'Saved / interested', icon: Heart, count: interestedPosts.length },
+    { id: 'notifications', label: 'Notifications', icon: Bell, count: notifications.length },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      
-      {/* Sleek Admin SaaS Command Banner for Staff Accounts */}
-      {isAdmin && (
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 p-6 text-white shadow-2xl border border-rose-500/20 group">
-          <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-[#C8382C]/20 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-700 pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                <ShieldAlert className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white">
-                    {user.role}
-                  </span>
-                  <p className="text-sm font-black text-white tracking-wide">Administrative Authority Granted</p>
-                </div>
-                <p className="text-xs text-slate-300 mt-1">Access master controls, review pending submissions, manage platform users, and track audit ledgers.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
-              <Link
-                to="/admin"
-                className="flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-extrabold bg-white text-slate-900 hover:bg-slate-100 shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-105"
-              >
-                <ShieldCheck className="w-4 h-4 text-[#C8382C]" /> Super Admin Portal
-              </Link>
-              <Link
-                to="/admin-dashboard"
-                className="flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-extrabold bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-md flex items-center justify-center gap-2 transition-all hover:scale-105"
-              >
-                Moderation Queue <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hero Profile Header */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xl">
-        {/* Top Cover Decorative Backdrop */}
-        <div className="h-28 bg-gradient-to-r from-[#C8382C]/10 via-amber-500/10 to-teal-500/10 border-b border-slate-100 relative">
-          <div className="absolute inset-0 bg-[radial-gradient(#C8382C_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
-        </div>
-
-        {/* Profile Content */}
-        <div className="px-6 sm:px-8 pb-8 pt-0 relative flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5 -mt-12">
-            <div className="relative group">
-              <img
-                src={user.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                alt={user.name}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white shadow-xl ring-2 ring-[#C8382C]/30 bg-white"
-              />
-              <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" title="Active Account" />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{user.name}</h1>
+    <div className="pb-20">
+      {/* Greeting header */}
+      <header className="container-page pt-10 sm:pt-14 pb-8">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+          <div className="flex items-start gap-5">
+            <Avatar name={user.name} src={user.profilePicture} size="lg" className="ring-4 ring-white shadow-[var(--shadow-soft)] hidden sm:inline-flex" />
+            <div className="min-w-0">
+              <p className="eyebrow deva">नमस्ते, {firstName}</p>
+              <h1 className="mt-1 text-4xl sm:text-5xl font-bold text-ink">
+                {greetingFor()}, {firstName}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-muted">
                 <VerificationBadge level={user.memberLevel} isVerified={user.isVerified} />
+                {user.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-brand" aria-hidden="true" /> {user.location}
+                  </span>
+                )}
+                {user.email && (
+                  <span className="inline-flex items-center gap-1.5 min-w-0">
+                    <Mail className="w-4 h-4" aria-hidden="true" /> <span className="truncate">{user.email}</span>
+                  </span>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
-                <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-slate-400" /> {user.email}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-[#C8382C]" /> {user.location}</span>
-              </div>
-              {user.bio && (
-                <p className="text-xs text-slate-600 max-w-xl line-clamp-2 italic pt-1">"{user.bio}"</p>
-              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto shrink-0">
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="flex-1 md:flex-none px-4 py-3 rounded-2xl font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 shadow-xs transition-all text-xs flex items-center justify-center gap-2 active:scale-95"
-            >
-              <Edit2 className="w-4 h-4 text-teal-600" /> Edit Profile
-            </button>
-            <Link
-              to="/create-post"
-              className="flex-1 md:flex-none px-5 py-3 rounded-2xl font-extrabold terracotta-btn text-white shadow-lg shadow-[#C8382C]/20 transition-all text-xs flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4" /> Request Help / Activity
+          <div className="flex flex-wrap gap-2.5">
+            <Link to="/create-post" className="btn btn-primary">
+              <Plus className="w-4 h-4" aria-hidden="true" /> Ask or offer help
             </Link>
+            <Link to="/explore" className="btn btn-ghost">
+              <Compass className="w-4 h-4" aria-hidden="true" /> Explore requests
+            </Link>
+            <button type="button" onClick={() => setShowEditModal(true)} className="btn btn-ghost">
+              <PenLine className="w-4 h-4" aria-hidden="true" /> Edit profile
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Modern Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Posts Created */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-md hover:shadow-lg transition-all group hover:-translate-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Posts Created</span>
-            <div className="w-9 h-9 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-[#C8382C] group-hover:text-white transition-colors">
-              <FileText className="w-4 h-4" />
+      <div className="container-page space-y-10">
+        {/* Staff shortcut */}
+        {isAdmin && (
+          <div className="rounded-[var(--radius-card)] bg-night text-white p-5 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <span className="w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="font-semibold flex flex-wrap items-center gap-2">
+                  Staff tools <span className="chip bg-brand text-white">{user.role}</span>
+                </p>
+                <p className="text-white/75 text-sm mt-0.5">Review pending submissions, manage members and platform settings.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <Link to="/admin" className="btn btn-sm bg-white text-ink hover:bg-paper">
+                <ShieldCheck className="w-4 h-4 text-brand" aria-hidden="true" /> Admin command center
+              </Link>
+              <Link to="/admin-dashboard" className="btn btn-light btn-sm">
+                Moderation queue <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </Link>
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 mt-2">{myPosts.length}</p>
-          <p className="text-[10px] font-semibold text-slate-400 mt-1">Total initiatives created</p>
-        </div>
+        )}
 
-        {/* Approved Posts */}
-        <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 p-5 rounded-3xl border border-emerald-200/80 shadow-md hover:shadow-lg transition-all group hover:-translate-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800">Approved</span>
-            <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-              <CheckCircle2 className="w-4 h-4" />
+        {/* Stats */}
+        <section aria-label="Your activity" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map(({ label, value, icon: Icon, tone }) => (
+            <div key={label} className="card p-5">
+              <span className={`w-10 h-10 rounded-full flex items-center justify-center ${tone}`}>
+                <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
+              </span>
+              <p className="mt-4 font-display text-4xl font-bold text-ink leading-none">{value}</p>
+              <p className="mt-1.5 text-sm text-muted">{label}</p>
             </div>
+          ))}
+        </section>
+
+        {/* Status notices for own posts */}
+        {(pendingPosts.length > 0 || rejectedPosts.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-4">
+            {pendingPosts.length > 0 && (
+              <div className="rounded-[var(--radius-card)] bg-marigold-tint border border-marigold/30 p-5 flex items-start gap-3">
+                <Hourglass className="w-5 h-5 text-marigold-text shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-ink">
+                    {pendingPosts.length} {pendingPosts.length === 1 ? 'post is' : 'posts are'} waiting for review
+                  </p>
+                  <p className="text-sm text-ink-soft mt-0.5">A moderator checks each post before it goes public. You'll get a notification once it's reviewed.</p>
+                </div>
+              </div>
+            )}
+            {rejectedPosts.length > 0 && (
+              <div className="rounded-[var(--radius-card)] bg-brand-tint border border-brand/20 p-5 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-brand shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-ink">
+                    {rejectedPosts.length} {rejectedPosts.length === 1 ? 'post was' : 'posts were'} not approved
+                  </p>
+                  <p className="text-sm text-ink-soft mt-0.5">See the reason under each post in “My posts” below.</p>
+                </div>
+              </div>
+            )}
           </div>
-          <p className="text-3xl font-black text-emerald-900 mt-2">{approvedPosts.length}</p>
-          <p className="text-[10px] font-semibold text-emerald-700 mt-1">Verified & public</p>
-        </div>
+        )}
 
-        {/* Activities Joined */}
-        <div className="bg-gradient-to-br from-sky-50/80 to-blue-50/50 p-5 rounded-3xl border border-sky-200/80 shadow-md hover:shadow-lg transition-all group hover:-translate-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800">Joined Drives</span>
-            <div className="w-9 h-9 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center group-hover:bg-sky-600 group-hover:text-white transition-colors">
-              <UserCheck className="w-4 h-4" />
-            </div>
+        {/* Badges */}
+        <section className="card p-6 sm:p-8" aria-labelledby="dash-badges">
+          <h2 id="dash-badges" className="sr-only">Your badges</h2>
+          <BadgeList userId={user._id} />
+        </section>
+
+        {/* Tabs */}
+        <section>
+          <div role="tablist" aria-label="Dashboard sections" className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 border-b border-sand">
+            {tabs.map(({ id, label, icon: Icon, count }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${id}`}
+                  aria-selected={active}
+                  aria-controls={`panel-${id}`}
+                  onClick={() => setActiveTab(id)}
+                  className={`relative shrink-0 inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap after:absolute after:left-3 after:right-3 after:-bottom-[5px] after:h-[2px] after:rounded-full after:transition-transform ${
+                    active ? 'text-ink after:bg-brand after:scale-x-100' : 'text-muted hover:text-ink after:scale-x-0'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${active ? 'text-brand' : ''}`} aria-hidden="true" />
+                  {label}
+                  <span className={`chip !px-2 !py-0 ${active ? 'bg-brand-tint text-brand' : 'bg-paper-deep text-ink-soft'}`}>{count}</span>
+                </button>
+              );
+            })}
           </div>
-          <p className="text-3xl font-black text-sky-900 mt-2">{joinedActivities.length}</p>
-          <p className="text-[10px] font-semibold text-sky-700 mt-1">Drives participated in</p>
-        </div>
 
-        {/* Impact / People Helped */}
-        <div className="bg-gradient-to-br from-amber-50/80 to-yellow-50/50 p-5 rounded-3xl border border-amber-200/80 shadow-md hover:shadow-lg transition-all group hover:-translate-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">People Helped</span>
-            <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-3xl font-black text-amber-900 mt-2">{totalPeopleHelped}+</p>
-          <p className="text-[10px] font-semibold text-amber-700 mt-1">Community impact score</p>
-        </div>
-
-        {/* Interested Items */}
-        <div className="bg-gradient-to-br from-rose-50/80 to-pink-50/50 p-5 rounded-3xl border border-rose-200/80 shadow-md hover:shadow-lg transition-all group hover:-translate-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-800">Bookmarks</span>
-            <div className="w-9 h-9 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
-              <Heart className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-3xl font-black text-rose-900 mt-2">{interestedPosts.length}</p>
-          <p className="text-[10px] font-semibold text-rose-700 mt-1">Saved items</p>
-        </div>
-      </div>
-
-      {/* Community Achievements & Badges Card */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-        <BadgeList userId={user._id} />
-      </div>
-
-      {/* Pill Tab Navigation Container */}
-      <div className="space-y-6">
-        <div className="bg-slate-100/90 p-1.5 rounded-2xl flex items-center gap-1 overflow-x-auto border border-slate-200/70 shadow-inner">
-          <button
-            onClick={() => setActiveTab('my-posts')}
-            className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'my-posts'
-                ? 'bg-white text-[#C8382C] shadow-md shadow-slate-200/60 scale-[1.02]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <FileText className="w-4 h-4" /> My Posts
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'my-posts' ? 'bg-[#C8382C]/10 text-[#C8382C]' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {myPosts.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('joined')}
-            className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'joined'
-                ? 'bg-white text-teal-700 shadow-md shadow-slate-200/60 scale-[1.02]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" /> Joined Drives
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'joined' ? 'bg-teal-100 text-teal-800' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {joinedActivities.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('interested')}
-            className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'interested'
-                ? 'bg-white text-rose-600 shadow-md shadow-slate-200/60 scale-[1.02]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <Heart className="w-4 h-4 text-rose-500 fill-rose-500/20" /> Saved / Interested
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'interested' ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {interestedPosts.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'notifications'
-                ? 'bg-white text-amber-700 shadow-md shadow-slate-200/60 scale-[1.02]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <Bell className="w-4 h-4 text-amber-600" /> Notifications
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'notifications' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {notifications.length}
-            </span>
-          </button>
-        </div>
-
-        {/* Tab Panel Content */}
-        <div className="pt-2">
-          {activeTab === 'my-posts' && (
-            <div className="space-y-6">
-              {myPosts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="pt-8" role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+            {activeTab === 'my-posts' &&
+              (myPosts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {myPosts.map((post) => (
-                    <div key={post._id} className="relative group">
-                      <div className="absolute top-3 left-3 z-10">
-                        <span className={`text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full border shadow-sm backdrop-blur-md ${
-                          post.status === 'APPROVED' ? 'bg-emerald-500/90 text-white border-emerald-400' :
-                          post.status === 'PENDING' ? 'bg-amber-500/90 text-white border-amber-400' :
-                          'bg-rose-500/90 text-white border-rose-400'
-                        }`}>
-                          {post.status}
-                        </span>
+                    <div key={post._id} className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusChip status={post.status} />
                       </div>
                       <PostCard post={post} />
+                      {post.status === 'REJECTED' && (
+                        <div className="rounded-2xl bg-brand-tint border border-brand/20 px-4 py-3 text-sm">
+                          <p className="font-semibold text-brand-dark">Reason from the moderator</p>
+                          <p className="text-ink-soft mt-0.5">{post.rejectionReason || 'No reason was given.'}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="bg-white p-12 sm:p-16 rounded-3xl border border-slate-200/80 text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 rounded-2xl bg-rose-50 text-[#C8382C] flex items-center justify-center mx-auto border border-rose-100 shadow-inner">
-                    <FileText className="w-8 h-8" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h3 className="text-lg font-extrabold text-slate-900">No Help Posts Created Yet</h3>
-                    <p className="text-xs text-slate-500">Need community support or want to organize a local volunteer drive? Create your first post in seconds.</p>
-                  </div>
-                  <Link
-                    to="/create-post"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-extrabold terracotta-btn text-white shadow-lg shadow-[#C8382C]/20 transition-all hover:scale-105"
-                  >
-                    <PlusCircle className="w-4 h-4" /> Create Your First Activity
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
+                <EmptyState
+                  icon={FileText}
+                  title="You haven't posted yet"
+                  text="Need a hand, or want to organise something in your neighbourhood? Create your first post — it takes a minute."
+                  action={
+                    <Link to="/create-post" className="btn btn-primary">
+                      <Plus className="w-4 h-4" aria-hidden="true" /> Ask or offer help
+                    </Link>
+                  }
+                />
+              ))}
 
-          {activeTab === 'joined' && (
-            <div className="space-y-6">
-              {joinedActivities.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {activeTab === 'joined' &&
+              (joinedActivities.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {joinedActivities.map((post) => (
                     <PostCard key={post._id} post={post} />
                   ))}
                 </div>
               ) : (
-                <div className="bg-white p-12 sm:p-16 rounded-3xl border border-slate-200/80 text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto border border-teal-100 shadow-inner">
-                    <UserCheck className="w-8 h-8" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h3 className="text-lg font-extrabold text-slate-900">No Joined Community Drives</h3>
-                    <p className="text-xs text-slate-500">Explore active tree plantations, river cleanups, tutoring programs, and blood donation drives happening across Nepal.</p>
-                  </div>
-                  <Link
-                    to="/explore"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-extrabold bg-teal-700 hover:bg-teal-800 text-white shadow-lg shadow-teal-700/20 transition-all hover:scale-105"
-                  >
-                    <Compass className="w-4 h-4" /> Explore Community Drives
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
+                <EmptyState
+                  icon={UserCheck}
+                  title="No drives joined yet"
+                  text="Browse help requests and community drives near you, and join one that fits your time."
+                  action={
+                    <Link to="/explore" className="btn btn-pine">
+                      <Compass className="w-4 h-4" aria-hidden="true" /> Explore help requests
+                    </Link>
+                  }
+                />
+              ))}
 
-          {activeTab === 'interested' && (
-            <div className="space-y-6">
-              {interestedPosts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {activeTab === 'interested' &&
+              (interestedPosts.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {interestedPosts.map((post) => (
                     <PostCard key={post._id} post={post} />
                   ))}
                 </div>
               ) : (
-                <div className="bg-white p-12 sm:p-16 rounded-3xl border border-slate-200/80 text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 shadow-inner">
-                    <Heart className="w-8 h-8" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h3 className="text-lg font-extrabold text-slate-900">No Saved / Bookmarked Posts</h3>
-                    <p className="text-xs text-slate-500">Click the heart icon on any community post or event to bookmark it for quick access later.</p>
-                  </div>
-                  <Link
-                    to="/explore"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all hover:scale-105"
-                  >
-                    <Compass className="w-4 h-4" /> Discover Initiatives
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
+                <EmptyState
+                  icon={Heart}
+                  title="Nothing saved yet"
+                  text="Mark a post as interested and it will be kept here for later."
+                  action={
+                    <Link to="/explore" className="btn btn-ghost">
+                      <Compass className="w-4 h-4" aria-hidden="true" /> Discover initiatives
+                    </Link>
+                  }
+                />
+              ))}
 
-          {activeTab === 'notifications' && (
-            <div className="space-y-3">
-              {notifications.length > 0 ? (
-                <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-md divide-y divide-slate-100">
+            {activeTab === 'notifications' &&
+              (notifications.length > 0 ? (
+                <ul className="card divide-y divide-sand overflow-hidden">
                   {notifications.map((n) => (
-                    <div key={n._id} className="p-5 flex items-start gap-4 hover:bg-slate-50/80 transition-colors">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200/70 flex items-center justify-center shrink-0 shadow-xs">
-                        <Bell className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5 flex-1">
-                        <p className="font-extrabold text-slate-900 text-sm">{n.title}</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">{n.message}</p>
-                        <p className="text-[10px] font-bold text-slate-400 pt-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {new Date(n.createdAt).toLocaleDateString()}
+                    <li key={n._id} className={`p-5 flex items-start gap-4 ${n.read ? '' : 'bg-brand-tint/30'}`}>
+                      <span className="w-10 h-10 rounded-full bg-marigold-tint text-marigold-text flex items-center justify-center shrink-0">
+                        <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-ink">{n.title}</p>
+                        {n.message && <p className="text-ink-soft text-sm leading-relaxed mt-0.5">{n.message}</p>}
+                        <p className="text-xs text-muted mt-1.5 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" aria-hidden="true" /> {new Date(n.createdAt).toLocaleDateString()}
                         </p>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <div className="bg-white p-12 rounded-3xl border border-slate-200/80 text-center space-y-3 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mx-auto">
-                    <Bell className="w-6 h-6" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500">No new notifications in your history.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                <EmptyState icon={Bell} title="No notifications yet" text="Updates on your posts and the drives you join will appear here." />
+              ))}
+          </div>
+        </section>
+
+        {/* Quick links */}
+        <section className="grid sm:grid-cols-3 gap-4" aria-label="Quick links">
+          <Link to={`/profile/${user._id}`} className="card card-hover p-5 flex items-center gap-3">
+            <User className="w-5 h-5 text-sky-ink" aria-hidden="true" />
+            <span className="font-semibold text-ink">View my public profile</span>
+            <ArrowRight className="w-4 h-4 text-muted ml-auto" aria-hidden="true" />
+          </Link>
+          <Link to="/events" className="card card-hover p-5 flex items-center gap-3">
+            <CalendarDays className="w-5 h-5 text-pine" aria-hidden="true" />
+            <span className="font-semibold text-ink">Upcoming events</span>
+            <ArrowRight className="w-4 h-4 text-muted ml-auto" aria-hidden="true" />
+          </Link>
+          <Link to="/organizations" className="card card-hover p-5 flex items-center gap-3">
+            <ShieldCheck className="w-5 h-5 text-brand" aria-hidden="true" />
+            <span className="font-semibold text-ink">Organisations</span>
+            <ArrowRight className="w-4 h-4 text-muted ml-auto" aria-hidden="true" />
+          </Link>
+        </section>
+
+        <ChangePasswordCard />
       </div>
 
-      {/* Edit Profile Modal Component */}
-      <EditProfileModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-      />
-
+      <EditProfileModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} />
     </div>
   );
 };

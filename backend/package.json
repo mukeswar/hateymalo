@@ -1,15 +1,15 @@
 {
   "name": "haatemalo-backend",
   "version": "1.0.0",
-  "description": "HAATEMALO - Full-stack Community Help and Collaboration Platform Backend",
+  "description": "HATEYMALO - Full-stack Community Help and Collaboration Platform Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node seed.js"
   },
-  "keywords": ["haatemalo", "community", "nepal", "help", "collaboration"],
-  "author": "HAATEMALO Team",
+  "keywords": ["hateymalo", "community", "nepal", "help", "collaboration"],
+  "author": "HATEYMALO Team",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.2",

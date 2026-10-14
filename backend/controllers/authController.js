@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Post = require('../models/Post');
 const { JWT_SECRET } = require('../middleware/auth');
 const { getSettings } = require('../utils/settingsCache');
+const { effectivePermissions } = require('../utils/permissions');
 
 // Generate Token
 const generateToken = (id) => {
@@ -33,8 +34,9 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists with this email' });
     }
 
-    // First registered user can optionally be made admin if email matches admin@haatemalo.org
-    const role = email.toLowerCase().includes('admin') ? 'ADMIN' : 'USER';
+    // Public sign-up always creates a regular member. Staff roles are granted only
+    // by a Super Admin (an email containing "admin" used to self-grant ADMIN).
+    const role = 'USER';
 
     const user = await User.create({
       name,
@@ -43,7 +45,7 @@ const registerUser = async (req, res) => {
       role,
       profilePicture: profilePicture || undefined,
       location: location || 'Kathmandu, Nepal',
-      bio: bio || 'Community member on HAATEMALO',
+      bio: bio || 'Community member on HATEYMALO',
       skills: Array.isArray(skills) ? skills : skills ? skills.split(',').map((s) => s.trim()) : [],
       interests: Array.isArray(interests) ? interests : interests ? interests.split(',').map((i) => i.trim()) : [],
     });
@@ -133,6 +135,10 @@ const getMe = async (req, res) => {
         skills: user.skills,
         interests: user.interests,
         createdAt: user.createdAt,
+        memberLevel: user.memberLevel,
+        isVerified: user.isVerified,
+        // What this account may do in the admin areas (empty for members)
+        permissions: effectivePermissions(user),
         totalPosts,
         totalActivitiesJoined,
       },
@@ -188,12 +194,44 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Change own password (requires the current password)
+// @route   PUT /api/auth/password
+// @access  Private
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Please enter your current and new password' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user || !(await user.matchPassword(currentPassword))) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    }
+    if (await user.matchPassword(newPassword)) {
+      return res.status(400).json({ success: false, message: 'New password must be different from the current one' });
+    }
+
+    user.password = newPassword; // hashed by the User model's pre-save hook
+    await user.save();
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get user profile by ID (public view)
 // @route   GET /api/auth/user/:id
 // @access  Public
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    // Public endpoint: never expose contact details or moderation history
+    const user = await User.findById(req.params.id).select(
+      '-password -email -warnings -isBanned -banReason -suspendedUntil -suspensionReason'
+    );
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -240,6 +278,7 @@ module.exports = {
   loginUser,
   getMe,
   updateProfile,
+  changePassword,
   getUserById,
   getPublicMembers,
 };

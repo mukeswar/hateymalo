@@ -4,6 +4,7 @@ import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Bell,
+  BellOff,
   CheckCircle2,
   AlertTriangle,
   Heart,
@@ -41,15 +42,22 @@ const NotificationDropdown = () => {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   // Resolve where a notification should link, based on which entity it references.
@@ -94,107 +102,124 @@ const NotificationDropdown = () => {
   const getIcon = (type) => {
     switch (type) {
       case 'POST_APPROVED':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />;
+        return { Icon: CheckCircle2, cls: 'bg-pine-tint text-pine' };
       case 'POST_REJECTED':
-        return <AlertTriangle className="w-4 h-4 text-[#C8382C] shrink-0" />;
+        return { Icon: AlertTriangle, cls: 'bg-brand-tint text-brand' };
       case 'INTEREST':
-        return <Heart className="w-4 h-4 text-rose-600 fill-rose-600 shrink-0" />;
+        return { Icon: Heart, cls: 'bg-brand-tint text-brand' };
       case 'JOIN':
-        return <UserPlus className="w-4 h-4 text-teal-600 shrink-0" />;
+        return { Icon: UserPlus, cls: 'bg-pine-tint text-pine' };
       case 'COMMENT':
       case 'REPLY':
-        return <MessageSquare className="w-4 h-4 text-sky-600 shrink-0" />;
+        return { Icon: MessageSquare, cls: 'bg-sky-tint text-sky-ink' };
       case 'POST_UPDATE':
       case 'ANNOUNCEMENT':
       case 'EVENT':
-        return <Megaphone className="w-4 h-4 text-amber-600 shrink-0" />;
+        return { Icon: Megaphone, cls: 'bg-marigold-tint text-marigold-text' };
       case 'WARNING':
-        return <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />;
+        return { Icon: AlertTriangle, cls: 'bg-marigold-tint text-marigold-text' };
       default:
-        return <Bell className="w-4 h-4 text-[#C8382C] shrink-0" />;
+        return { Icon: Bell, cls: 'bg-paper-deep text-ink-soft' };
     }
+  };
+
+  const formatWhen = (d) => {
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${date.toLocaleDateString()}`;
   };
 
   if (!user) return null;
 
   return (
     <div className="relative" ref={dropdownRef}>
-      
-      {/* Bell Trigger Button */}
+      {/* Bell trigger */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-9 h-9 rounded-xl bg-slate-100/90 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 border border-slate-200/60 shadow-2xs transition-all flex items-center justify-center cursor-pointer shrink-0"
-        title="Notifications"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        className="relative w-10 h-10 rounded-full flex items-center justify-center text-ink-soft hover:bg-paper-deep transition-colors shrink-0"
       >
-        <Bell className="w-4 h-4" />
+        <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#C8382C] text-[9px] font-black text-white shadow-md animate-pulse">
+          <span
+            className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-brand text-white text-[10px] font-bold leading-none ring-2 ring-paper"
+            aria-hidden="true"
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Notifications Panel */}
+      {/* Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl p-4 shadow-2xl z-50 border border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          
-          {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div
+          className="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-[4.5rem] sm:top-auto sm:mt-2 sm:w-96 card !rounded-2xl z-50 overflow-hidden animate-in zoom-in-95 origin-top-right"
+          role="region"
+          aria-label="Notifications"
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-sand">
             <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-slate-900 text-sm">Notifications</h3>
-              {unreadCount > 0 && (
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 text-[#C8382C] border border-rose-200">
-                  {unreadCount} new
-                </span>
-              )}
+              <h3 className="font-display text-base font-semibold text-ink">Notifications</h3>
+              {unreadCount > 0 && <span className="chip bg-brand-tint text-brand">{unreadCount} new</span>}
             </div>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAllRead}
-                className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 transition-colors"
+                className="text-sm font-semibold text-pine hover:text-pine-dark inline-flex items-center gap-1.5 rounded-full px-2 py-1 hover:bg-pine-tint transition-colors"
               >
-                <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                <CheckCheck className="w-4 h-4" aria-hidden="true" /> Mark all read
               </button>
             )}
           </div>
 
-          {/* List */}
-          <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+          <div className="max-h-[22rem] overflow-y-auto overscroll-contain">
             {notifications.length > 0 ? (
-              notifications.map((n) => (
-                <div
-                  key={n._id}
-                  onClick={() => handleMarkAsRead(n)}
-                  className={`p-3 rounded-2xl cursor-pointer transition-all duration-200 flex items-start gap-3 border ${
-                    n.read
-                      ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      : 'bg-rose-50/50 border-rose-200 text-slate-900 shadow-xs hover:bg-rose-50'
-                  }`}
-                >
-                  <div className="mt-0.5 p-1.5 rounded-xl bg-white border border-slate-200 shrink-0">
-                    {getIcon(n.type)}
-                  </div>
-                  
-                  <div className="space-y-0.5 flex-grow">
-                    <p className="text-xs font-extrabold text-slate-900 leading-tight">{n.title}</p>
-                    <p className="text-xs text-slate-700 leading-relaxed">{n.message}</p>
-                    <p className="text-[10px] text-slate-500 pt-0.5 font-medium">
-                      {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(n.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-
-                  {!n.read && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#C8382C] shrink-0 mt-1.5" />
-                  )}
-                </div>
-              ))
+              <ul className="divide-y divide-sand">
+                {notifications.map((n) => {
+                  const { Icon, cls } = getIcon(n.type);
+                  return (
+                    <li key={n._id}>
+                      <button
+                        type="button"
+                        onClick={() => handleMarkAsRead(n)}
+                        className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
+                          n.read ? 'hover:bg-paper' : 'bg-brand-tint/40 hover:bg-brand-tint/70'
+                        }`}
+                      >
+                        <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${cls}`}>
+                          <Icon className="w-4 h-4" aria-hidden="true" />
+                        </span>
+                        <span className="flex-grow min-w-0 space-y-0.5">
+                          <span className={`block text-sm leading-snug ${n.read ? 'font-medium text-ink-soft' : 'font-semibold text-ink'}`}>
+                            {n.title}
+                          </span>
+                          {n.message && <span className="block text-sm text-muted leading-snug">{n.message}</span>}
+                          <span className="block text-xs text-muted pt-0.5">{formatWhen(n.createdAt)}</span>
+                        </span>
+                        {!n.read && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-brand shrink-0 mt-1.5">
+                            <span className="sr-only">Unread</span>
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <div className="py-8 text-center text-xs font-semibold text-slate-500">
-                🔔 No notifications yet. You're all caught up!
+              <div className="px-6 py-10 text-center">
+                <span className="w-12 h-12 mx-auto rounded-full bg-paper-deep text-muted flex items-center justify-center">
+                  <BellOff className="w-5 h-5" aria-hidden="true" />
+                </span>
+                <p className="mt-3 text-sm font-semibold text-ink">You're all caught up</p>
+                <p className="text-sm text-muted">New activity on your posts will show up here.</p>
               </div>
             )}
           </div>
-
         </div>
       )}
     </div>

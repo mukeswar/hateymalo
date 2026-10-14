@@ -3,6 +3,10 @@ const Event = require('../models/Event');
 const Blog = require('../models/Blog');
 const User = require('../models/User');
 
+// Search is public: only profile fields anyone may see (no email, moderation
+// state or permissions). Organisations keep their public contact details.
+const PUBLIC_USER_FIELDS = 'name profilePicture location bio skills interests memberLevel isVerified role orgDetails createdAt';
+
 // @desc    Global universal search across all entities
 // @route   GET /api/search
 // @access  Public
@@ -79,7 +83,7 @@ const globalSearch = async (req, res) => {
 
     // 4. Members Search
     if (entityType === 'ALL' || entityType === 'MEMBERS') {
-      let memberQuery = { memberLevel: { $ne: 'ORGANIZATION' } };
+      let memberQuery = { memberLevel: { $ne: 'ORGANIZATION' }, isBanned: { $ne: true } };
       if (regex) {
         memberQuery.$or = [
           { name: regex },
@@ -92,7 +96,7 @@ const globalSearch = async (req, res) => {
       if (location) memberQuery.location = new RegExp(location, 'i');
 
       results.members = await User.find(memberQuery)
-        .select('-password')
+        .select(PUBLIC_USER_FIELDS)
         .sort({ isVerified: -1, createdAt: -1 })
         .limit(20);
     }
@@ -100,6 +104,7 @@ const globalSearch = async (req, res) => {
     // 5. Organizations Search
     if (entityType === 'ALL' || entityType === 'ORGANIZATIONS') {
       let orgQuery = {
+        isBanned: { $ne: true },
         $or: [
           { memberLevel: 'ORGANIZATION' },
           { 'orgDetails.orgName': { $ne: '' } },
@@ -119,7 +124,7 @@ const globalSearch = async (req, res) => {
       }
 
       results.organizations = await User.find(orgQuery)
-        .select('-password')
+        .select(PUBLIC_USER_FIELDS)
         .sort({ isVerified: -1, createdAt: -1 })
         .limit(20);
     }

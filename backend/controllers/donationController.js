@@ -4,6 +4,7 @@ const DonationExpense = require('../models/DonationExpense');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const { isStaff } = require('../utils/roles');
+const { hasPermission } = require('../utils/permissions');
 const { getSettings } = require('../utils/settingsCache');
 
 // @desc    Create a donation campaign for a post
@@ -171,7 +172,7 @@ const addExpenseRecord = async (req, res) => {
     }
 
     const isCreator = campaign.creator.toString() === req.user._id.toString();
-    const isAdmin = isStaff(req.user);
+    const isAdmin = hasPermission(req.user, 'canManageDonations');
 
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Not authorized to log expenses for this campaign' });

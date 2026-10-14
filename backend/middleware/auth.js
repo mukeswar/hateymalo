@@ -1,6 +1,12 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { hasPermission } = require('../utils/permissions');
 
+// The fallback secret is public in the repo — anyone could forge admin tokens with it,
+// so a deployed (Vercel) build refuses to start without a real JWT_SECRET.
+if (process.env.VERCEL && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not set in the Vercel environment variables');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'haatemalo_super_secret_jwt_key_2026';
 
 const protect = async (req, res, next) => {
@@ -47,6 +53,23 @@ const protect = async (req, res, next) => {
   }
 };
 
+// For public routes whose response depends on who is asking (e.g. staff see
+// unmoderated content). Never rejects: a missing/invalid token or a banned or
+// suspended account is simply treated as anonymous.
+const optionalAuth = async (req, res, next) => {
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer')) {
+    try {
+      const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
+      const user = await User.findById(decoded.id).select('-password');
+      if (user && !user.isBanned && !user.isSuspended) req.user = user;
+    } catch {
+      /* anonymous */
+    }
+  }
+  next();
+};
+
 const adminOnly = (req, res, next) => {
   if (req.user && ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(req.user.role)) {
     return next();
@@ -63,25 +86,24 @@ const superAdminOnly = (req, res, next) => {
   }
 };
 
+// Staff-only route guard for one named permission (see utils/permissions.js).
+// SUPER_ADMIN always passes; ADMIN/MODERATOR need the permission; members never pass.
 const checkPermission = (permissionName) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
 
-    if (req.user.role === 'SUPER_ADMIN') {
-      return next();
-    }
-
-    if (req.user.permissions && req.user.permissions.includes(permissionName)) {
+    if (hasPermission(req.user, permissionName)) {
       return next();
     }
 
     return res.status(403).json({
       success: false,
-      message: `Access denied: Insufficient permission. Required: ${permissionName}`,
+      message: 'You do not have access to this area. Ask the Super Admin to grant it.',
+      requiredPermission: permissionName,
     });
   };
 };
 
-module.exports = { protect, adminOnly, superAdminOnly, checkPermission, JWT_SECRET };
+module.exports = { protect, optionalAuth, adminOnly, superAdminOnly, checkPermission, requirePermission: checkPermission, JWT_SECRET };

@@ -1,46 +1,63 @@
-import React from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './layouts/Navbar';
 import Footer from './layouts/Footer';
+import QuoteBand from './components/QuoteBand';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 import Home from './pages/Home';
-import ExplorePosts from './pages/ExplorePosts';
-import PostDetails from './pages/PostDetails';
-import CreatePost from './pages/CreatePost';
-import Categories from './pages/Categories';
-import Members from './pages/Members';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import UserProfile from './pages/UserProfile';
-import UserDashboard from './pages/UserDashboard';
-import About from './pages/About';
+const ExplorePosts = lazy(() => import('./pages/ExplorePosts'));
+const PostDetails = lazy(() => import('./pages/PostDetails'));
+const CreatePost = lazy(() => import('./pages/CreatePost'));
+const Categories = lazy(() => import('./pages/Categories'));
+const Members = lazy(() => import('./pages/Members'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const UserDashboard = lazy(() => import('./pages/UserDashboard'));
+const About = lazy(() => import('./pages/About'));
 
 // Phase 3 & 4 Pages
-import Events from './pages/Events';
-import EventDetails from './pages/EventDetails';
-import Blogs from './pages/Blogs';
-import BlogDetails from './pages/BlogDetails';
-import CreateBlog from './pages/CreateBlog';
-import Donate from './pages/Donate';
-import GlobalSearch from './pages/GlobalSearch';
-import Organizations from './pages/Organizations';
+const Events = lazy(() => import('./pages/Events'));
+const EventDetails = lazy(() => import('./pages/EventDetails'));
+const Blogs = lazy(() => import('./pages/Blogs'));
+const BlogDetails = lazy(() => import('./pages/BlogDetails'));
+const CreateBlog = lazy(() => import('./pages/CreateBlog'));
+const Donate = lazy(() => import('./pages/Donate'));
+const GlobalSearch = lazy(() => import('./pages/GlobalSearch'));
+const Organizations = lazy(() => import('./pages/Organizations'));
 
 // Master Admin Dashboards
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import NotFound from './pages/NotFound';
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+// Home ships in the main bundle; every other page (and the chart-heavy admin
+// dashboards) loads on demand so first visits stay fast.
+const PageFallback = () => (
+  <div className="container-page py-16 space-y-4" aria-busy="true" aria-label="Loading page">
+    <div className="h-10 w-2/3 max-w-md rounded-xl bg-paper-deep animate-pulse" />
+    <div className="h-5 w-full max-w-xl rounded-lg bg-paper-deep animate-pulse" />
+    <div className="h-64 rounded-[var(--radius-card)] bg-paper-deep animate-pulse" />
+  </div>
+);
 
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
 
+  // Start each new page at the top (hash links like #main keep their own target)
+  useEffect(() => {
+    if (!location.hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-slate-900 selection:bg-[#C8382C] selection:text-white">
+    <div className="min-h-screen flex flex-col bg-paper text-ink">
       {!isAdminRoute && <Navbar />}
-      
-      <main key={location.pathname} className={isAdminRoute ? 'h-screen w-screen overflow-hidden' : 'flex-grow animate-in fade-in slide-in-from-bottom-2 duration-300 transform-gpu'}>
+
+      <main id="main" tabIndex={-1} key={location.pathname} className={isAdminRoute ? 'h-screen w-screen overflow-hidden' : 'flex-grow animate-in slide-in-from-bottom-2 outline-none'}>
+        <Suspense fallback={<PageFallback />}>
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
           <Route path="/explore" element={<ExplorePosts />} />
@@ -108,8 +125,10 @@ function App() {
           {/* 404 Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </main>
 
+      {!isAdminRoute && !['/login', '/register'].includes(location.pathname) && <QuoteBand key={`quote-${location.pathname}`} />}
       {!isAdminRoute && <Footer />}
     </div>
   );

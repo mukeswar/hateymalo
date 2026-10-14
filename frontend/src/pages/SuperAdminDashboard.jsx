@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import Avatar from '../components/ui/Avatar';
 import {
   AreaChart,
   Area,
@@ -25,49 +26,257 @@ import {
   MessageSquare,
   Users,
   Building2,
-  HeartHandshake,
   DollarSign,
   Receipt,
-  CreditCard,
-  Bell,
   Megaphone,
-  Mail,
   ShieldAlert,
   Settings,
   Lock,
   Search,
   UserPlus,
   FolderKanban,
-  TrendingUp,
-  TrendingDown,
-  ChevronDown,
   Menu,
   X,
   CheckCircle2,
   Inbox,
   Plus,
-  Edit2,
   Trash2,
-  ShieldCheck,
-  Check,
-  Filter,
   RefreshCw,
-  Eye,
   Download,
-  UserX,
-  UserCheck,
-  Award,
   ExternalLink,
-  Sparkles,
+  Star,
+  MapPin,
+  LogOut,
+  BadgeCheck,
+  Ban,
+  ImageOff,
+  QrCode,
+  ShieldCheck,
+  Globe,
 } from 'lucide-react';
 
+/* --------------------------------------------------------------------------
+   Presentational helpers (markup only — no data logic lives here)
+   -------------------------------------------------------------------------- */
+
+const CHART_COLORS = ['#B5232C', '#1E5A47', '#E9A23B', '#2F5D8A', '#6B6157', '#8E1A22'];
+
+const TH = 'px-4 py-3 font-semibold whitespace-nowrap';
+const TD = 'px-4 py-3 align-middle whitespace-nowrap';
+// Long free text (titles, locations, comments) wraps to at most two lines instead of being cut off
+const TD_TEXT = 'px-4 py-3 align-middle whitespace-normal min-w-[12rem] max-w-[22rem]';
+const ROW = 'hover:bg-paper transition-colors';
+
+const BTN_APPROVE = 'btn btn-sm btn-pine min-h-10';
+const BTN_DANGER = 'btn btn-sm min-h-10 bg-brand-tint text-brand hover:bg-brand hover:text-white';
+const BTN_GHOST = 'btn btn-sm btn-ghost min-h-10';
+
+const statusTone = (status = '') => {
+  const s = String(status).toUpperCase();
+  if (['APPROVED', 'ACTIVE', 'COMPLETED', 'VERIFIED', 'PUBLISHED', 'SUCCESS'].includes(s)) return 'bg-pine-tint text-pine';
+  if (['PENDING', 'UPCOMING', 'DRAFT', 'PAUSED'].includes(s)) return 'bg-marigold-tint text-marigold-text';
+  if (['REJECTED', 'CANCELLED', 'SUSPENDED', 'BANNED', 'FAILED', 'CLOSED'].includes(s)) return 'bg-brand-tint text-brand';
+  return 'bg-sky-tint text-sky-ink';
+};
+
+const StatusChip = ({ status, children }) => (
+  <span className={`chip ${statusTone(status)}`}>{children || status}</span>
+);
+
+const Panel = ({ title, count, description, actions, children }) => (
+  <section className="card overflow-hidden animate-rise">
+    <div className="flex flex-col gap-3 border-b border-sand p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="text-xl font-bold text-ink">
+          {title}
+          {count !== undefined && <span className="ml-2 align-middle text-sm font-semibold text-muted">({count})</span>}
+        </h2>
+        {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+    {children}
+  </section>
+);
+
+const DataTable = ({ head, children, minWidth = 'min-w-[720px]' }) => (
+  <div className="overflow-x-auto">
+    <table className={`w-full ${minWidth} text-left text-sm`}>
+      <thead className="bg-paper/70 text-xs uppercase tracking-wider text-muted">
+        <tr>
+          {head.map((h, i) => (
+            <th key={i} className={`${TH} ${h.right ? 'text-right' : ''}`}>{h.label || h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-sand">{children}</tbody>
+    </table>
+  </div>
+);
+
+const EmptyRow = ({ colSpan, children }) => (
+  <tr>
+    <td colSpan={colSpan} className="px-4 py-12 text-center">
+      <Inbox className="mx-auto mb-2 h-7 w-7 text-muted/60" aria-hidden="true" />
+      <p className="text-sm font-medium text-muted">{children}</p>
+    </td>
+  </tr>
+);
+
+const EmptyBlock = ({ icon: Icon = Inbox, children, action }) => (
+  <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+    <Icon className="mb-2 h-7 w-7 text-muted/60" aria-hidden="true" />
+    <p className="text-sm font-medium text-muted">{children}</p>
+    {action && <div className="mt-4">{action}</div>}
+  </div>
+);
+
+const SearchField = ({ value, onChange, placeholder, id }) => (
+  <div className="relative w-full max-w-sm">
+    <label htmlFor={id} className="sr-only">{placeholder}</label>
+    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+    <input id={id} type="text" value={value} onChange={onChange} placeholder={placeholder} className="field !pl-10" />
+  </div>
+);
+
+const FeatureButton = ({ featured, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={!!featured}
+    className={`btn btn-sm min-h-10 ${featured ? 'bg-marigold text-ink hover:brightness-95' : 'bg-marigold-tint text-marigold-text hover:bg-[#F8E3BC]'}`}
+  >
+    <Star className={`h-3.5 w-3.5 ${featured ? 'fill-current' : ''}`} aria-hidden="true" />
+    {featured ? 'Featured' : 'Feature'}
+  </button>
+);
+
+// Permission tick-list used when adding staff or editing their access.
+// Finance permissions are grouped separately because they expose donor data.
+const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
+  if (!catalog) return <p className="text-sm text-muted">Loading permissions…</p>;
+  const finance = ['canViewDonations', 'canManageDonations'];
+  const toggle = (key, on) => onChange(on ? [...new Set([...value, key])] : value.filter((k) => k !== key));
+  const group = (title, items, warn) => (
+    <fieldset className="space-y-2">
+      <legend className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">{title}</legend>
+      {warn && <p className="rounded-xl bg-marigold-tint px-3 py-2 text-xs text-marigold-text">{warn}</p>}
+      {items.map((p) => (
+        <label key={p.key} htmlFor={`${idPrefix}-${p.key}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-sand p-3 hover:bg-paper">
+          <input
+            id={`${idPrefix}-${p.key}`}
+            type="checkbox"
+            checked={value.includes(p.key)}
+            onChange={(e) => toggle(p.key, e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[#B5232C]"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-ink">{p.label}</span>
+            <span className="block text-xs text-muted">{p.hint}</span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  );
+  return (
+    <div className="space-y-4">
+      {group('Moderation & community', catalog.permissions.filter((p) => !finance.includes(p.key)))}
+      {group('Finance (confidential)', catalog.permissions.filter((p) => finance.includes(p.key)), 'Only grant to people you trust with donor names, amounts and transaction IDs.')}
+      <p className="text-xs text-muted">Settings, staff management, roles and the activity log always stay with the Super Admin.</p>
+    </div>
+  );
+};
+
+const Modal = ({ title, icon: Icon, onClose, size = 'max-w-md', children }) => {
+  const titleId = useId();
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-sm animate-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`card !rounded-3xl w-full ${size} max-h-[90vh] overflow-y-auto p-5 sm:p-6 animate-pop`}
+      >
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <h2 id={titleId} className="flex items-center gap-2 text-xl font-bold text-ink">
+            {Icon && <Icon className="h-5 w-5 text-brand" aria-hidden="true" />}
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="-mr-1 -mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-paper hover:text-ink"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const KpiTile = ({ label, value, hint, hintClass = 'text-muted', icon: Icon, tone, className = '' }) => (
+  <div className={`card p-4 sm:p-5 ${className}`}>
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-sm font-medium text-muted">{label}</span>
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+      </span>
+    </div>
+    <p className="mt-2 font-display text-2xl font-bold leading-none text-ink sm:text-3xl tabular-nums">{value}</p>
+    <p className={`mt-1.5 text-xs font-semibold ${hintClass}`}>{hint}</p>
+  </div>
+);
+
 const SuperAdminDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, can, isSuperAdmin } = useAuth();
+
+  // Which permission each section needs ('super' = Super Admin only). The server enforces the same rules.
+  const TAB_ACCESS = {
+    dashboard: null,
+    approval: 'canApprovePosts',
+    posts: 'canApprovePosts',
+    blogs: 'canApprovePosts',
+    events: 'canManageEvents',
+    reports: 'canManageReports',
+    comments: 'canDeletePosts',
+    members: 'canManageUsers',
+    orgs: 'canManageUsers',
+    volunteers: 'canManageUsers',
+    categories: 'canManageCategories',
+    donations: 'canViewDonations',
+    campaigns: 'canViewDonations',
+    expenses: 'canViewDonations',
+    admins: 'super',
+    settings: 'super',
+    logs: 'super',
+  };
+  const canTab = (tab) => {
+    const need = TAB_ACCESS[tab];
+    if (!need) return true;
+    return need === 'super' ? isSuperAdmin : can(need);
+  };
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Mobile navigation drawer (the sidebar is always visible from lg up)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter state per module
@@ -119,8 +328,12 @@ const SuperAdminDashboard = () => {
   });
 
   const [showStaffModal, setShowStaffModal] = useState(false);
+  // Staff access management (Super Admin): permission catalogue + the account being edited
+  const [accessCatalog, setAccessCatalog] = useState(null);
+  const [editingAccess, setEditingAccess] = useState(null); // { _id, name, role, permissions }
   const [staffForm, setStaffForm] = useState({
-    name: '', email: '', password: '', role: 'ADMIN', permissions: ['canApprovePosts', 'canManageUsers']
+    // Empty permissions → the server applies the role's default access
+    name: '', email: '', password: '', role: 'MODERATOR', permissions: []
   });
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -181,15 +394,19 @@ const SuperAdminDashboard = () => {
   // 1. Fetch Overview & Live Metrics
   const fetchDashboardData = async () => {
     try {
+      // Each source loads independently, and only when this staff member may see it,
+      // so one refused request never breaks the whole overview.
+      const skip = Promise.resolve(null);
+      const safe = (p) => p.catch(() => null);
       const [analyticsRes, pendingRes, postsRes, donationsRes, reportsRes] = await Promise.all([
-        API.get('/super-admin/analytics?timeRange=30_DAYS'),
-        API.get('/super-admin/approval-center?contentType=POSTS'),
-        API.get('/posts?status=ALL'),
-        API.get('/donations/campaigns'),
-        API.get('/reports'),
+        safe(API.get('/super-admin/analytics?timeRange=30_DAYS')),
+        can('canApprovePosts') ? safe(API.get('/super-admin/approval-center?contentType=POSTS')) : skip,
+        safe(API.get('/posts?status=ALL')),
+        can('canViewDonations') ? safe(API.get('/donations/campaigns')) : skip,
+        can('canManageReports') ? safe(API.get('/reports')) : skip,
       ]);
 
-      if (analyticsRes.data.success) {
+      if (analyticsRes?.data.success) {
         const s = analyticsRes.data.data.summary;
         const c = analyticsRes.data.data.charts;
 
@@ -211,7 +428,7 @@ const SuperAdminDashboard = () => {
         }
 
         if (c.postsByCategory && c.postsByCategory.length > 0) {
-          const colors = ['#0F766E', '#B91C1C', '#C2410C', '#D97706', '#64748B', '#94A3B8'];
+          const colors = CHART_COLORS;
           setCategoryDonutData(
             c.postsByCategory.map((item, idx) => ({
               name: item.category,
@@ -222,10 +439,10 @@ const SuperAdminDashboard = () => {
         }
       }
 
-      if (pendingRes.data.success) setPendingApprovalsList(pendingRes.data.data);
-      if (postsRes.data.success) setRecentActivitiesList(postsRes.data.data.slice(0, 5));
-      if (donationsRes.data.success) setRecentDonationsList(donationsRes.data.data.slice(0, 5));
-      if (reportsRes.data.success) {
+      if (pendingRes?.data.success) setPendingApprovalsList(pendingRes.data.data);
+      if (postsRes?.data.success) setRecentActivitiesList(postsRes.data.data.slice(0, 5));
+      if (donationsRes?.data.success) setRecentDonationsList(donationsRes.data.data.slice(0, 5));
+      if (reportsRes?.data.success) {
         setReportsList(reportsRes.data.data);
         setStats((prev) => ({ ...prev, pendingReports: reportsRes.data.count || 0 }));
       }
@@ -238,6 +455,7 @@ const SuperAdminDashboard = () => {
 
   // Fetch tab-specific dynamic backend data
   const fetchTabData = async (tab) => {
+    if (!canTab(tab)) return;
     try {
       if (tab === 'posts') {
         const res = await API.get('/posts?status=ALL');
@@ -255,6 +473,7 @@ const SuperAdminDashboard = () => {
         const res = await API.get('/admin/comments');
         if (res.data.success) setCommentsList(res.data.data);
       } else if (tab === 'members' || tab === 'orgs' || tab === 'volunteers' || tab === 'admins') {
+        if (tab === 'admins') loadAccessCatalog();
         const res = await API.get('/admin/users');
         if (res.data.success) {
           setMembersList(res.data.data);
@@ -302,7 +521,14 @@ const SuperAdminDashboard = () => {
   }, [activeTab]);
 
   // Tab change handler
+  // Never show a section this staff member has no access to
+  useEffect(() => {
+    if (!canTab(activeTab)) setActiveTab('dashboard');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user]);
+
   const handleTabChange = (tab) => {
+    if (!canTab(tab)) return;
     setActiveTab(tab);
     setSearchQuery('');
     setFilterCategory('All');
@@ -652,6 +878,52 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  // ---- Staff access management ----
+  const loadAccessCatalog = async () => {
+    if (accessCatalog) return accessCatalog;
+    try {
+      const res = await API.get('/super-admin/access-catalog');
+      if (res.data.success) {
+        setAccessCatalog(res.data.data);
+        return res.data.data;
+      }
+    } catch (error) {
+      showToast('Could not load the permission list', 'error');
+    }
+    return null;
+  };
+
+  const presetFor = (role, catalog = accessCatalog) => catalog?.rolePresets?.[role] || [];
+
+  // Opens the access editor for a staff member, or for a member being promoted to staff
+  const openAccessEditor = async (person) => {
+    const catalog = await loadAccessCatalog();
+    const role = ['ADMIN', 'MODERATOR'].includes(person.role) ? person.role : 'MODERATOR';
+    const current = person.permissions?.length ? person.permissions : presetFor(role, catalog);
+    setEditingAccess({ _id: person._id, name: person.name, role, permissions: current, promoting: person.role === 'USER' });
+  };
+
+  const handleSaveAccess = async (e) => {
+    e.preventDefault();
+    if (!editingAccess) return;
+    if (editingAccess.promoting && !window.confirm(`Give ${editingAccess.name} staff access as ${editingAccess.role}?`)) return;
+    try {
+      const res = await API.put(`/super-admin/staff/${editingAccess._id}/permissions`, {
+        role: editingAccess.role,
+        permissions: editingAccess.permissions,
+      });
+      if (res.data.success) {
+        showToast(`Access updated for ${editingAccess.name}`, 'success');
+        setEditingAccess(null);
+        fetchTabData(activeTab);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to update access', 'error');
+    }
+  };
+
+  const permissionLabel = (key) => accessCatalog?.permissions?.find((p) => p.key === key)?.label || key;
+
   const handleDeleteStaff = async (staffId) => {
     if (!window.confirm('Remove staff/admin access?')) return;
     try {
@@ -710,362 +982,410 @@ const SuperAdminDashboard = () => {
     document.body.removeChild(link);
   };
 
-  return (
-    <div className="h-screen w-screen bg-[#F8FAFC] text-slate-800 flex overflow-hidden font-sans select-none">
-      
-      {/* 1. COMPACT RED SIDEBAR (CLEAN ORIGINAL BRAND DESIGN) */}
-      <aside className={`bg-[#94201B] text-white w-60 shrink-0 flex flex-col justify-between h-full border-r border-red-950/20 ${sidebarOpen ? 'flex' : 'hidden lg:flex'}`}>
-        <div className="p-3.5 space-y-3 overflow-hidden flex-1 flex flex-col">
-          
-          {/* Logo Header */}
-          <div className="flex items-center gap-2.5 pb-2 border-b border-white/10 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-white text-[#94201B] flex items-center justify-center font-black shadow-xs">
-              <HeartHandshake className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-base font-black tracking-tight leading-none text-white">हातेमालो</h1>
-              <p className="text-[9px] font-semibold text-rose-200 mt-0.5">Super Admin SaaS Panel</p>
-            </div>
-          </div>
+  // ---- Derived view data (same filters as before, computed once per render) ----
+  const filteredPosts = postsList.filter((p) => {
+    const matchSearch = !searchQuery || p.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus = filterStatus === 'All' || p.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+  const filteredMembers = membersList.filter((u) => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredOrgs = membersList
+    .filter((u) => u.memberLevel === 'ORGANIZATION')
+    .filter((org) => !searchQuery || org.name?.toLowerCase().includes(searchQuery.toLowerCase()) || org.email?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredVolunteers = membersList
+    .filter((u) => u.role === 'USER')
+    .filter((vol) => filterCategory === 'All' || vol.memberLevel === filterCategory)
+    .filter((vol) => !searchQuery || vol.name?.toLowerCase().includes(searchQuery.toLowerCase()) || vol.email?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const staffList = membersList.filter((u) => ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(u.role));
 
-          {/* Navigation Menu */}
-          <nav className="space-y-3 text-[11px] font-semibold overflow-y-auto pr-1 flex-1">
-            
-            {/* Dashboard */}
-            <div>
+  const NAV_GROUPS = [
+    {
+      label: null,
+      items: [{ id: 'dashboard', label: 'Overview', icon: LayoutDashboard }],
+    },
+    {
+      label: 'Content & moderation',
+      items: [
+        { id: 'approval', label: 'Approval center', icon: Clock, badge: stats.pendingApprovals, badgeTone: 'bg-marigold-tint text-marigold-text' },
+        { id: 'posts', label: 'Posts', icon: FileText },
+        { id: 'blogs', label: 'Blogs & stories', icon: BookOpen },
+        { id: 'events', label: 'Events', icon: Calendar },
+        { id: 'reports', label: 'Reports', icon: AlertTriangle, badge: stats.pendingReports, badgeTone: 'bg-brand text-white' },
+        { id: 'comments', label: 'Comments', icon: MessageSquare },
+      ],
+    },
+    {
+      label: 'Community',
+      items: [
+        { id: 'members', label: 'Members', icon: Users },
+        { id: 'orgs', label: 'Organizations', icon: Building2 },
+        { id: 'volunteers', label: 'Volunteers', icon: UserPlus },
+        { id: 'categories', label: 'Categories', icon: FolderKanban },
+      ],
+    },
+    {
+      label: 'Finance & donations',
+      items: [
+        { id: 'donations', label: 'Donations', icon: DollarSign },
+        { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
+        { id: 'expenses', label: 'Expenses', icon: Receipt },
+      ],
+    },
+    {
+      label: 'System',
+      items: [
+        { id: 'admins', label: 'Admins & roles', icon: ShieldAlert },
+        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'logs', label: 'Activity logs', icon: Lock },
+      ],
+    },
+  ];
+
+  const goToTab = (tab) => {
+    handleTabChange(tab);
+    setSidebarOpen(false);
+  };
+
+  const renderNav = () => (
+    <nav aria-label="Admin sections" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+      {NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => canTab(it.id)) }))
+        .filter((g) => g.items.length > 0)
+        .map((group, gi) => (
+        <div key={gi} className="space-y-0.5">
+          {group.label && (
+            <p className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+          )}
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
               <button
-                onClick={() => handleTabChange('dashboard')}
-                className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === 'dashboard' ? 'bg-white/20 text-white font-bold shadow-xs' : 'text-rose-100 hover:bg-white/10'
+                key={item.id}
+                type="button"
+                onClick={() => goToTab(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`group relative flex min-h-10 w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
+                  active ? 'bg-brand-tint font-semibold text-brand' : 'font-medium text-ink-soft hover:bg-paper hover:text-ink'
                 }`}
               >
-                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard Overview
-              </button>
-            </div>
-
-            {/* CONTENT & MODERATION */}
-            <div className="space-y-0.5">
-              <p className="px-3 text-[9px] uppercase font-bold text-rose-200/60 tracking-wider">CONTENT & MODERATION</p>
-              
-              <button onClick={() => handleTabChange('approval')} className={`w-full flex items-center justify-between px-3 py-1 rounded-lg transition-all ${activeTab === 'approval' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <span className="flex items-center gap-2.5"><Clock className="w-3.5 h-3.5" /> Approval Center</span>
-                {stats.pendingApprovals > 0 && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-white/20 text-white font-bold">{stats.pendingApprovals}</span>
+                {active && <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-brand" aria-hidden="true" />}
+                <span className="flex items-center gap-2.5">
+                  <Icon className={`h-[18px] w-[18px] ${active ? 'text-brand' : 'text-muted group-hover:text-ink'}`} aria-hidden="true" />
+                  {item.label}
+                </span>
+                {item.badge > 0 && (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${item.badgeTone}`}>{item.badge}</span>
                 )}
               </button>
-
-              <button onClick={() => handleTabChange('posts')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'posts' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <FileText className="w-3.5 h-3.5" /> Posts
-              </button>
-
-              <button onClick={() => handleTabChange('blogs')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'blogs' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <BookOpen className="w-3.5 h-3.5" /> Blogs & Stories
-              </button>
-
-              <button onClick={() => handleTabChange('events')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'events' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <Calendar className="w-3.5 h-3.5" /> Events
-              </button>
-
-              <button onClick={() => handleTabChange('reports')} className={`w-full flex items-center justify-between px-3 py-1 rounded-lg transition-all ${activeTab === 'reports' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <span className="flex items-center gap-2.5"><AlertTriangle className="w-3.5 h-3.5" /> Reports</span>
-                {stats.pendingReports > 0 && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-rose-400 text-white font-bold">{stats.pendingReports}</span>
-                )}
-              </button>
-
-              <button onClick={() => handleTabChange('comments')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'comments' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}>
-                <MessageSquare className="w-3.5 h-3.5" /> Comments
-              </button>
-            </div>
-
-            {/* COMMUNITY */}
-            <div className="space-y-0.5">
-              <p className="px-3 text-[9px] uppercase font-bold text-rose-200/60 tracking-wider">COMMUNITY</p>
-              <button onClick={() => handleTabChange('members')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'members' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Users className="w-3.5 h-3.5" /> Members</button>
-              <button onClick={() => handleTabChange('orgs')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'orgs' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Building2 className="w-3.5 h-3.5" /> Organizations</button>
-              <button onClick={() => handleTabChange('volunteers')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'volunteers' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><UserPlus className="w-3.5 h-3.5" /> Volunteers</button>
-              <button onClick={() => handleTabChange('categories')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'categories' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><FolderKanban className="w-3.5 h-3.5" /> Categories</button>
-            </div>
-
-            {/* FINANCE & DONATIONS */}
-            <div className="space-y-0.5">
-              <p className="px-3 text-[9px] uppercase font-bold text-rose-200/60 tracking-wider">FINANCE & DONATIONS</p>
-              <button onClick={() => handleTabChange('donations')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'donations' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><DollarSign className="w-3.5 h-3.5" /> Donations</button>
-              <button onClick={() => handleTabChange('campaigns')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'campaigns' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Megaphone className="w-3.5 h-3.5" /> Campaigns</button>
-              <button onClick={() => handleTabChange('expenses')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'expenses' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Receipt className="w-3.5 h-3.5" /> Expenses</button>
-            </div>
-
-            {/* SYSTEM */}
-            <div className="space-y-0.5">
-              <p className="px-3 text-[9px] uppercase font-bold text-rose-200/60 tracking-wider">SYSTEM</p>
-              <button onClick={() => handleTabChange('admins')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'admins' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><ShieldAlert className="w-3.5 h-3.5" /> Admins & Roles</button>
-              <button onClick={() => handleTabChange('settings')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'settings' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Settings className="w-3.5 h-3.5" /> Settings</button>
-              <button onClick={() => handleTabChange('logs')} className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-lg transition-all ${activeTab === 'logs' ? 'bg-white/20 text-white font-bold' : 'text-rose-100 hover:bg-white/10'}`}><Lock className="w-3.5 h-3.5" /> Activity Logs</button>
-            </div>
-
-          </nav>
-
+            );
+          })}
         </div>
+      ))}
+    </nav>
+  );
 
-        {/* Admin Profile Footer */}
-        <div className="p-3 border-t border-white/10 bg-black/10 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <img
-              src={user?.profilePicture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-              alt={user?.name || 'Admin'}
-              className="w-8 h-8 rounded-full object-cover border border-white/30"
-            />
-            <div>
-              <p className="text-[11px] font-bold text-white leading-tight truncate">{user?.name || 'Super Admin'}</p>
-              <p className="text-[9px] text-rose-200 font-medium">{user?.role || 'SUPER_ADMIN'}</p>
-            </div>
+  const renderProfileFooter = () => (
+    <div className="flex items-center justify-between gap-2 border-t border-sand p-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Avatar name={user?.name || 'Super Admin'} src={user?.profilePicture} size="sm" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold leading-tight text-ink">{user?.name || 'Super Admin'}</p>
+          <p className="truncate text-xs text-muted">{user?.role || 'SUPER_ADMIN'}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={logout}
+        aria-label="Log out"
+        title="Log out"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-brand-tint hover:text-brand"
+      >
+        <LogOut className="h-[18px] w-[18px]" />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-paper font-sans text-ink">
+
+      {/* SIDEBAR — desktop */}
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-sand bg-white lg:flex">
+        <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sand px-5">
+          <img src="/logo-mark.png" alt="" className="h-9 w-9 object-contain" />
+          <div className="leading-tight">
+            <p className="font-display text-lg font-bold text-ink">Command center</p>
+            <p className="deva text-xs text-muted">
+              हातेमालो · {isSuperAdmin ? 'Super admin' : user?.role === 'ADMIN' ? 'Admin' : 'Moderator'}
+            </p>
           </div>
-          <button onClick={logout} className="text-rose-200 hover:text-white p-1" title="Logout">
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
         </div>
-
+        {renderNav()}
+        {renderProfileFooter()}
       </aside>
 
-      {/* 2. MAIN CONTENT AREA (CLEAN LIGHT BACKGROUND) */}
-      <div className="flex-grow flex flex-col min-w-0 h-full overflow-hidden">
-        
-        {/* TOP NAVIGATION BAR */}
-        <header className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between shrink-0 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden">
-              <Menu className="w-4 h-4" />
-            </button>
-
-            <div className="relative w-64 sm:w-80">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search anything..."
-                className="w-full bg-slate-100 border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-[11px] text-slate-800 outline-none focus:border-[#94201B] transition-colors"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+      {/* SIDEBAR — mobile drawer */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation">
+          <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm animate-in" onClick={() => setSidebarOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col bg-white shadow-[var(--shadow-lift)] animate-rise">
+            <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-sand px-4">
+              <div className="flex items-center gap-2.5">
+                <img src="/logo-mark.png" alt="" className="h-8 w-8 object-contain" />
+                <p className="font-display text-lg font-bold text-ink">Command center</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close navigation"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-paper hover:text-ink"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-          </div>
+            {renderNav()}
+            {renderProfileFooter()}
+          </aside>
+        </div>
+      )}
 
-          <div className="flex items-center gap-3">
-            <button onClick={() => fetchTabData(activeTab)} className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100" title="Refresh Live Data">
-              <RefreshCw className="w-4 h-4" />
+      {/* MAIN COLUMN */}
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+
+        {/* TOP BAR */}
+        <header className="shrink-0 border-b border-sand bg-white/90 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:flex-nowrap sm:gap-3 sm:px-6 lg:h-16 lg:px-8">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Open navigation"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-paper lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
             </button>
 
-            <Link to="/" className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-[11px] font-semibold flex items-center gap-1">
-              <ExternalLink className="w-3.5 h-3.5" /> Main Site
-            </Link>
+            <div className="flex min-w-0 items-center gap-2 lg:hidden">
+              <img src="/logo-mark.png" alt="" className="h-8 w-8 shrink-0 object-contain" />
+              <p className="truncate font-display text-base font-bold text-ink">Command center</p>
+            </div>
 
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <img
-                src={user?.profilePicture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-                alt={user?.name || 'Admin'}
-                className="w-7 h-7 rounded-full object-cover border border-slate-300"
-              />
-              <div className="hidden sm:block text-left">
-                <p className="text-[11px] font-bold text-slate-800 leading-tight">{user?.name || 'Super Admin'}</p>
-                <p className="text-[9px] text-slate-500 font-medium">{user?.role || 'SUPER_ADMIN'}</p>
+            <div className="order-last w-full sm:order-none sm:w-auto sm:max-w-md sm:flex-1">
+              <div className="relative">
+                <label htmlFor="admin-global-search" className="sr-only">Search the current section</label>
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+                <input
+                  id="admin-global-search"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search this section…"
+                  className="field !rounded-full !py-2 !pl-10 !pr-10"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                    className="absolute right-1 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-paper hover:text-ink"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="ml-auto flex items-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => fetchTabData(activeTab)}
+                aria-label="Refresh live data"
+                title="Refresh live data"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-soft hover:bg-paper"
+              >
+                <RefreshCw className="h-[18px] w-[18px]" />
+              </button>
+
+              <Link to="/" className="btn btn-sm btn-ghost min-h-10" aria-label="View site">
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">View site</span>
+              </Link>
+
+              <div className="hidden items-center gap-2 border-l border-sand pl-3 md:flex">
+                <Avatar name={user?.name || 'Super Admin'} src={user?.profilePicture} size="sm" />
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-ink">{user?.name || 'Super Admin'}</p>
+                  <p className="text-xs text-muted">{user?.role || 'SUPER_ADMIN'}</p>
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        {/* MAIN BODY SCROLLABLE FRAME */}
-        <main className="flex-1 p-4 flex flex-col gap-3 overflow-y-auto">
-          
+        {/* SCROLLABLE BODY */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+
           {/* ========================================================================= */}
           {/* TAB 1: OVERVIEW DASHBOARD */}
           {/* ========================================================================= */}
           {activeTab === 'dashboard' && (
             <>
-              <div className="flex items-center justify-between shrink-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight leading-none">Namaste, {user?.name?.split(' ')[0] || 'Admin'}! 👋</h2>
-                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">Here's what's happening on हातेमालो today.</p>
+                  <p className="eyebrow deva">नमस्ते</p>
+                  <h1 className="mt-1 text-3xl font-bold text-ink sm:text-4xl">Namaste, {user?.name?.split(' ')[0] || 'Admin'}</h1>
+                  <p className="mt-1 text-muted">Here's what's happening on हातेमालो today.</p>
                 </div>
-
-                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-[10px] text-slate-600 shadow-2xs">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-semibold">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                </div>
-              </div>
-
-              {/* 5 KEY STATS CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 shrink-0">
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-semibold text-slate-500">Total Members</span>
-                    <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"><Users className="w-3.5 h-3.5" /></div>
-                  </div>
-                  <div className="mt-1">
-                    <p className="text-lg font-black text-slate-900 leading-none">{stats.totalMembers.toLocaleString()}</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">Authorized users</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-semibold text-slate-500">Active Activities</span>
-                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><FolderKanban className="w-3.5 h-3.5" /></div>
-                  </div>
-                  <div className="mt-1">
-                    <p className="text-lg font-black text-slate-900 leading-none">{stats.activeActivities}</p>
-                    <p className="text-[9px] font-bold text-emerald-600 mt-0.5">Approved & Live</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-semibold text-slate-500">Upcoming Events</span>
-                    <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><Calendar className="w-3.5 h-3.5" /></div>
-                  </div>
-                  <div className="mt-1">
-                    <p className="text-lg font-black text-slate-900 leading-none">{stats.upcomingEvents}</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">Official Assembly</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-semibold text-slate-500">Pending Approvals</span>
-                    <div className="w-6 h-6 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center"><FileText className="w-3.5 h-3.5" /></div>
-                  </div>
-                  <div className="mt-1">
-                    <p className="text-lg font-black text-slate-900 leading-none">{stats.pendingApprovals}</p>
-                    <p className="text-[9px] font-bold text-amber-600 mt-0.5">Review Queue</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-semibold text-slate-500">Total Donations</span>
-                    <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"><DollarSign className="w-3.5 h-3.5" /></div>
-                  </div>
-                  <div className="mt-1">
-                    <p className="text-lg font-black text-slate-900 leading-none">{stats.totalDonations}</p>
-                    <p className="text-[9px] font-bold text-emerald-600 mt-0.5">Voluntary Funds</p>
-                  </div>
+                <div className="chip self-start border border-sand bg-white py-1.5 text-ink-soft sm:self-auto">
+                  <Calendar className="h-4 w-4 text-muted" aria-hidden="true" />
+                  {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
               </div>
+
+              {/* KEY STATS */}
+              {loading ? (
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 lg:gap-4">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className={`h-[118px] animate-pulse rounded-[var(--radius-card)] bg-paper-deep ${i === 4 ? 'col-span-2 lg:col-span-1' : ''}`} />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 lg:gap-4">
+                  <KpiTile label="Total members" value={stats.totalMembers.toLocaleString()} hint="Registered users" icon={Users} tone="bg-brand-tint text-brand" />
+                  <KpiTile label="Active activities" value={stats.activeActivities} hint="Approved & live" hintClass="text-pine" icon={FolderKanban} tone="bg-pine-tint text-pine" />
+                  <KpiTile label="Upcoming events" value={stats.upcomingEvents} hint="Official events" icon={Calendar} tone="bg-sky-tint text-sky-ink" />
+                  <KpiTile label="Pending approvals" value={stats.pendingApprovals} hint="Review queue" hintClass="text-marigold-text" icon={Clock} tone="bg-marigold-tint text-marigold-text" />
+                  {can('canViewDonations') && (
+                    <KpiTile label="Total donations" value={stats.totalDonations} hint="Voluntary funds" hintClass="text-pine" icon={DollarSign} tone="bg-pine-tint text-pine" className="col-span-2 lg:col-span-1" />
+                  )}
+                </div>
+              )}
 
               {/* CHARTS ROW */}
-              <div className="grid grid-cols-12 gap-2.5 h-48 shrink-0">
-                <div className="col-span-7 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between overflow-hidden">
-                  <h3 className="text-xs font-bold text-slate-900">Activity Overview</h3>
-                  <div className="flex-1 w-full pt-1">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                <div className="card flex flex-col p-5 lg:col-span-7">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-lg font-bold text-ink">Member growth</h2>
+                    <span className="text-xs font-medium text-muted">Last 30 days</span>
+                  </div>
+                  <div className="mt-3 h-56 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activityOverviewData}>
+                      <AreaChart data={activityOverviewData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                         <defs>
                           <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#94201B" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#94201B" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#B5232C" stopOpacity={0.28} />
+                            <stop offset="95%" stopColor="#B5232C" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                        <XAxis dataKey="date" stroke="#94A3B8" fontSize={9} tickLine={false} />
-                        <YAxis stroke="#94A3B8" fontSize={9} tickLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#CBD5E1', borderRadius: '6px', fontSize: '10px' }} />
-                        <Area type="monotone" dataKey="val" stroke="#94201B" strokeWidth={2} fillOpacity={1} fill="url(#actGrad)" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8DFD2" />
+                        <XAxis dataKey="date" stroke="#6B6157" fontSize={11} tickLine={false} axisLine={{ stroke: '#E8DFD2' }} />
+                        <YAxis stroke="#6B6157" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E8DFD2', borderRadius: '12px', fontSize: '12px', color: '#1F1B16', boxShadow: '0 4px 16px -4px rgb(31 27 22 / 0.12)' }}
+                          cursor={{ stroke: '#E8DFD2' }}
+                        />
+                        <Area type="monotone" dataKey="val" name="Members" stroke="#B5232C" strokeWidth={2} fillOpacity={1} fill="url(#actGrad)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="col-span-5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between overflow-hidden">
-                  <h3 className="text-xs font-bold text-slate-900">Activities by Category</h3>
+                <div className="card flex flex-col p-5 lg:col-span-5">
+                  <h2 className="text-lg font-bold text-ink">Activities by category</h2>
                   {categoryDonutData.length > 0 ? (
-                    <div className="flex items-center justify-between flex-1">
-                      <div className="h-28 w-28 relative shrink-0">
+                    <div className="mt-3 flex flex-1 flex-col items-center gap-4 sm:flex-row">
+                      <div className="relative h-40 w-40 shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={categoryDonutData} innerRadius={28} outerRadius={44} paddingAngle={2} dataKey="value">
+                            <Pie data={categoryDonutData} innerRadius={44} outerRadius={70} paddingAngle={2} dataKey="value" stroke="#ffffff" strokeWidth={2}>
                               {categoryDonutData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E8DFD2', borderRadius: '12px', fontSize: '12px' }} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="space-y-1 text-[10px] pl-2 flex-1 overflow-y-auto max-h-28">
+                      <ul className="max-h-44 w-full flex-1 space-y-1.5 overflow-y-auto text-sm">
                         {categoryDonutData.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-slate-600 truncate">{item.name}</span>
-                            </div>
-                            <span className="font-bold text-slate-800 text-[10px] ml-2">{item.value}</span>
-                          </div>
+                          <li key={idx} className="flex items-center justify-between gap-2">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} aria-hidden="true" />
+                              <span className="truncate text-ink-soft">{item.name}</span>
+                            </span>
+                            <span className="font-semibold tabular-nums text-ink">{item.value}</span>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     </div>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-2">
-                      <FolderKanban className="w-6 h-6 text-slate-300 mb-1" />
-                      <p className="text-[11px] font-bold text-slate-600">No Post Categories</p>
-                    </div>
+                    <EmptyBlock icon={FolderKanban}>No posts in any category yet.</EmptyBlock>
                   )}
                 </div>
               </div>
 
-              {/* BOTTOM ROW: RECENT ACTIVITIES & QUICK ACTIONS */}
-              <div className="grid grid-cols-12 gap-2.5 flex-1 min-h-[200px]">
-                <div className="col-span-6 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between overflow-hidden">
-                  <div className="flex items-center justify-between shrink-0">
-                    <h3 className="text-xs font-bold text-slate-900">Recent Activities</h3>
-                    <button onClick={() => handleTabChange('posts')} className="text-[10px] font-bold text-rose-600 hover:underline">View All</button>
+              {/* RECENT ACTIVITIES & QUICK ACTIONS */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="card flex flex-col p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-lg font-bold text-ink">Recent activities</h2>
+                    <button type="button" onClick={() => handleTabChange('posts')} className="text-sm font-semibold text-brand hover:underline">
+                      View all
+                    </button>
                   </div>
-                  <div className="space-y-1.5 flex-1 overflow-y-auto mt-2 pr-1">
-                    {recentActivitiesList.map((act) => (
-                      <div key={act._id} className="flex items-center justify-between p-1.5 rounded-lg border border-slate-100 bg-slate-50/50 text-[10px]">
-                        <div className="flex items-center gap-2 truncate">
-                          <img src={act.images?.[0] || 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=80&q=80'} alt="" className="w-7 h-7 rounded-md object-cover shrink-0" />
-                          <div className="truncate">
-                            <p className="font-bold text-slate-800 truncate leading-tight">{act.title}</p>
-                            <p className="text-[9px] text-slate-500">{act.category} • {act.location}</p>
+                  {recentActivitiesList.length > 0 ? (
+                    <ul className="mt-3 divide-y divide-sand">
+                      {recentActivitiesList.map((act) => (
+                        <li key={act._id} className="flex items-center justify-between gap-3 py-2.5">
+                          <div className="flex min-w-0 items-center gap-3">
+                            {act.images?.[0] ? (
+                              <img src={act.images[0]} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                            ) : (
+                              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper-deep text-muted">
+                                <ImageOff className="h-4 w-4" aria-hidden="true" />
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold leading-tight text-ink">{act.title}</p>
+                              <p className="truncate text-xs text-muted">{act.category} · {act.location}</p>
+                            </div>
                           </div>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold shrink-0 ${act.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'}`}>{act.status}</span>
-                      </div>
-                    ))}
-                  </div>
+                          <StatusChip status={act.status} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <EmptyBlock>No posts have been submitted yet.</EmptyBlock>
+                  )}
                 </div>
 
-                <div className="col-span-6 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between overflow-hidden">
-                  <div className="flex items-center justify-between shrink-0">
-                    <h3 className="text-xs font-bold text-slate-900">Quick Actions</h3>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 flex-1 pt-2">
-                    <button onClick={() => setShowAnnouncementModal(true)} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <Megaphone className="w-4 h-4 text-[#94201B]" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Create Announcement</span>
-                    </button>
-                    <button onClick={() => setShowEventModal(true)} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <Calendar className="w-4 h-4 text-amber-600" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Create Event</span>
-                    </button>
-                    <button onClick={() => setShowStaffModal(true)} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <UserPlus className="w-4 h-4 text-emerald-600" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Add New Admin</span>
-                    </button>
-                    <button onClick={() => setShowCategoryModal(true)} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <FolderKanban className="w-4 h-4 text-purple-600" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Manage Categories</span>
-                    </button>
-                    <button onClick={() => setShowCampaignModal(true)} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <DollarSign className="w-4 h-4 text-sky-600" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Launch Campaign</span>
-                    </button>
-                    <button onClick={() => handleTabChange('settings')} className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center justify-center text-center gap-1">
-                      <Settings className="w-4 h-4 text-slate-600" />
-                      <span className="text-[10px] font-bold text-slate-800 leading-tight">Platform Settings</span>
-                    </button>
+                <div className="card p-5">
+                  <h2 className="text-lg font-bold text-ink">Quick actions</h2>
+                  <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                    {[
+                      { label: 'Create announcement', icon: Megaphone, tone: 'bg-brand-tint text-brand', onClick: () => setShowAnnouncementModal(true), allowed: can('canSendNotifications') },
+                      { label: 'Create event', icon: Calendar, tone: 'bg-sky-tint text-sky-ink', onClick: () => setShowEventModal(true), allowed: can('canManageEvents') },
+                      { label: 'Add new staff', icon: UserPlus, tone: 'bg-pine-tint text-pine', onClick: async () => { const catalog = await loadAccessCatalog(); setStaffForm((f) => ({ ...f, permissions: presetFor(f.role, catalog) })); setShowStaffModal(true); }, allowed: isSuperAdmin },
+                      { label: 'Manage categories', icon: FolderKanban, tone: 'bg-marigold-tint text-marigold-text', onClick: () => setShowCategoryModal(true), allowed: can('canManageCategories') },
+                      { label: 'Launch campaign', icon: DollarSign, tone: 'bg-pine-tint text-pine', onClick: () => setShowCampaignModal(true), allowed: can('canManageDonations') },
+                      { label: 'Platform settings', icon: Settings, tone: 'bg-paper-deep text-ink-soft', onClick: () => handleTabChange('settings'), allowed: isSuperAdmin },
+                      { label: 'Review queue', icon: Clock, tone: 'bg-marigold-tint text-marigold-text', onClick: () => handleTabChange('approval'), allowed: can('canApprovePosts') && !isSuperAdmin },
+                      { label: 'Open reports', icon: AlertTriangle, tone: 'bg-brand-tint text-brand', onClick: () => handleTabChange('reports'), allowed: can('canManageReports') && !isSuperAdmin },
+                    ].filter((qa) => qa.allowed).map((qa) => {
+                      const QIcon = qa.icon;
+                      return (
+                        <button
+                          key={qa.label}
+                          type="button"
+                          onClick={qa.onClick}
+                          className="card-hover flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-2xl border border-sand bg-white p-3 text-center"
+                        >
+                          <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${qa.tone}`}>
+                            <QIcon className="h-[18px] w-[18px]" aria-hidden="true" />
+                          </span>
+                          <span className="text-sm font-semibold leading-tight text-ink">{qa.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1076,861 +1396,923 @@ const SuperAdminDashboard = () => {
           {/* TAB 2: APPROVAL CENTER */}
           {/* ========================================================================= */}
           {activeTab === 'approval' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex items-center justify-between border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Approval Center Workflow</h3>
-                  <p className="text-[11px] text-slate-500">Review pending user submissions before they are published publicly across Nepal.</p>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                  {pendingApprovalsList.length} Pending Review
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Submission Title</th>
-                      <th className="p-3">Category</th>
-                      <th className="p-3">Creator / Author</th>
-                      <th className="p-3">Date Submitted</th>
-                      <th className="p-3 text-right">Actions</th>
+            <Panel
+              title="Approval center"
+              description="Review pending submissions before they are published publicly."
+              actions={<span className="chip bg-marigold-tint text-marigold-text">{pendingApprovalsList.length} pending review</span>}
+            >
+              <DataTable head={['Submission', 'Category', 'Creator / author', 'Submitted', { label: 'Actions', right: true }]}>
+                {pendingApprovalsList.length > 0 ? (
+                  pendingApprovalsList.map((item) => (
+                    <tr key={item._id} className={ROW}>
+                      <td className={TD_TEXT}>
+                        <p className="font-semibold text-ink">{item.title}</p>
+                        <p className="line-clamp-1 text-xs text-muted">{item.description}</p>
+                      </td>
+                      <td className={TD}><span className="chip bg-paper-deep text-ink-soft">{item.category}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{item.creator?.name || item.author?.name || 'Member'}</td>
+                      <td className={`${TD} whitespace-nowrap text-muted`}>{new Date(item.createdAt).toLocaleDateString()}</td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => handleApprovePost(item._id)} className={BTN_APPROVE}>
+                            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Approve
+                          </button>
+                          <button type="button" onClick={() => setRejectingItem({ id: item._id, type: 'POST' })} className={BTN_DANGER}>
+                            Reject
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {pendingApprovalsList.length > 0 ? (
-                      pendingApprovalsList.map((item) => (
-                        <tr key={item._id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-800">
-                            <p className="text-xs">{item.title}</p>
-                            <p className="text-[10px] text-slate-500 font-normal line-clamp-1">{item.description}</p>
-                          </td>
-                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-semibold">{item.category}</span></td>
-                          <td className="p-3">{item.creator?.name || item.author?.name || 'Member'}</td>
-                          <td className="p-3 text-slate-500">{new Date(item.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3 text-right space-x-2">
-                            <button onClick={() => handleApprovePost(item._id)} className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700">Approve</button>
-                            <button onClick={() => setRejectingItem({ id: item._id, type: 'POST' })} className="px-3 py-1 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700">Reject</button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold">Review queue is empty! All submissions reviewed.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>The review queue is empty — every submission has been reviewed.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 3: POSTS MODERATION */}
           {/* ========================================================================= */}
           {activeTab === 'posts' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Community Help Posts Directory ({postsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Manage all approved, pending, and rejected mutual aid posts.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-100 border border-slate-300 rounded-lg text-xs p-1.5 outline-none font-bold">
-                    <option value="All">All Statuses</option>
+            <Panel
+              title="Community help posts"
+              count={postsList.length}
+              description="Manage approved, pending and rejected mutual-aid posts."
+              actions={
+                <>
+                  <label htmlFor="posts-status-filter" className="sr-only">Filter by status</label>
+                  <select id="posts-status-filter" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="field !w-auto !py-2">
+                    <option value="All">All statuses</option>
                     <option value="APPROVED">APPROVED</option>
                     <option value="PENDING">PENDING</option>
                     <option value="REJECTED">REJECTED</option>
                   </select>
-                  <button onClick={() => exportCSV(postsList, 'haatemalo_posts')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
-                    <Download className="w-3.5 h-3.5" /> Export CSV
+                  <button type="button" onClick={() => exportCSV(postsList, 'hateymalo_posts')} className={BTN_GHOST}>
+                    <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
                   </button>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Title & Details</th>
-                      <th className="p-3">Category</th>
-                      <th className="p-3">Location</th>
-                      <th className="p-3">Creator</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {postsList.filter((p) => {
-                      const matchSearch = !searchQuery || p.title?.toLowerCase().includes(searchQuery.toLowerCase());
-                      const matchStatus = filterStatus === 'All' || p.status === filterStatus;
-                      return matchSearch && matchStatus;
-                    }).map((post) => (
-                      <tr key={post._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-800 max-w-xs truncate">{post.title}</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">{post.category}</span></td>
-                        <td className="p-3 text-slate-600">{post.location}</td>
-                        <td className="p-3 font-medium">{post.creator?.name || 'Member'}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${post.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : post.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
-                            {post.status}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right space-x-1">
-                          {post.status !== 'APPROVED' && <button onClick={() => handleApprovePost(post._id)} className="px-2 py-1 rounded bg-emerald-600 text-white font-bold">Approve</button>}
-                          {post.status === 'APPROVED' && (
-                            <button onClick={() => handleFeaturePost(post._id, !post.isFeatured)} className={`px-2 py-1 rounded font-bold ${post.isFeatured ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}>
-                              {post.isFeatured ? '★ Featured' : '☆ Feature'}
-                            </button>
+                </>
+              }
+            >
+              <DataTable head={['Title', 'Category', 'Location', 'Creator', 'Status', { label: 'Actions', right: true }]} minWidth="min-w-[860px]">
+                {filteredPosts.length > 0 ? (
+                  filteredPosts.map((post) => (
+                    <tr key={post._id} className={ROW}>
+                      <td className={`${TD_TEXT} font-semibold text-ink`}><Link to={`/post/${post._id}`} target="_blank" rel="noopener noreferrer" title={post.title} className="line-clamp-2 hover:text-brand hover:underline">{post.title}</Link></td>
+                      <td className={TD}><span className="chip bg-paper-deep text-ink-soft">{post.category}</span></td>
+                      <td className={`${TD_TEXT} text-ink-soft`}><span className="line-clamp-2">{post.location}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{post.creator?.name || 'Member'}</td>
+                      <td className={TD}><StatusChip status={post.status} /></td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          {post.status !== 'APPROVED' && (
+                            <button type="button" onClick={() => handleApprovePost(post._id)} className={BTN_APPROVE}>Approve</button>
                           )}
-                          <button onClick={() => handleDeletePost(post._id)} className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold hover:bg-rose-200">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          {post.status === 'PENDING' && (
+                            <button type="button" onClick={() => setRejectingItem({ id: post._id, type: 'POST' })} className={BTN_GHOST}>Reject</button>
+                          )}
+                          {post.status === 'APPROVED' && (
+                            <FeatureButton featured={post.isFeatured} onClick={() => handleFeaturePost(post._id, !post.isFeatured)} />
+                          )}
+                          {can('canDeletePosts') && (<button type="button" onClick={() => handleDeletePost(post._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={6}>{postsList.length > 0 ? 'No posts match this search or filter.' : 'No posts yet.'}</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 4: BLOGS MODERATION */}
           {/* ========================================================================= */}
           {activeTab === 'blogs' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Stories & Blog Submissions ({blogsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Moderate community stories and editorial blogs.</p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Title</th>
-                      <th className="p-3">Author</th>
-                      <th className="p-3">Category</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {blogsList.map((blog) => (
-                      <tr key={blog._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-800 max-w-xs truncate">{blog.title}</td>
-                        <td className="p-3">{blog.author?.name || 'Author'}</td>
-                        <td className="p-3">{blog.category}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${blog.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{blog.status}</span>
-                        </td>
-                        <td className="p-3 text-right space-x-1">
-                          {blog.status !== 'APPROVED' && <button onClick={() => handleApproveBlog(blog._id)} className="px-2 py-1 rounded bg-emerald-600 text-white font-bold">Approve</button>}
-                          {blog.status === 'APPROVED' && (
-                            <button onClick={() => handleFeatureBlog(blog)} className={`px-2 py-1 rounded font-bold ${blog.isFeatured ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}>
-                              {blog.isFeatured ? '★ Featured' : '☆ Feature'}
-                            </button>
+            <Panel title="Stories & blog submissions" count={blogsList.length} description="Moderate community stories and editorial blogs.">
+              <DataTable head={['Title', 'Author', 'Category', 'Status', { label: 'Actions', right: true }]} minWidth="min-w-[820px]">
+                {blogsList.length > 0 ? (
+                  blogsList.map((blog) => (
+                    <tr key={blog._id} className={ROW}>
+                      <td className={`${TD_TEXT} font-semibold text-ink`}><Link to={`/blogs/${blog._id}`} target="_blank" rel="noopener noreferrer" title={blog.title} className="line-clamp-2 hover:text-brand hover:underline">{blog.title}</Link></td>
+                      <td className={`${TD} text-ink-soft`}>{blog.author?.name || 'Author'}</td>
+                      <td className={`${TD} text-ink-soft`}>{blog.category}</td>
+                      <td className={TD}><StatusChip status={blog.status} /></td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          {blog.status !== 'APPROVED' && (
+                            <button type="button" onClick={() => handleApproveBlog(blog._id)} className={BTN_APPROVE}>Approve</button>
                           )}
-                          <button onClick={() => handleDeleteBlog(blog._id)} className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          {blog.status === 'PENDING' && (
+                            <button type="button" onClick={() => setRejectingItem({ id: blog._id, type: 'BLOG' })} className={BTN_GHOST}>Reject</button>
+                          )}
+                          {blog.status === 'APPROVED' && (
+                            <FeatureButton featured={blog.isFeatured} onClick={() => handleFeatureBlog(blog)} />
+                          )}
+                          {can('canDeletePosts') && (<button type="button" onClick={() => handleDeleteBlog(blog._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>No blog stories have been submitted yet.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 5: OFFICIAL EVENTS */}
           {/* ========================================================================= */}
           {activeTab === 'events' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Official Assemblies & Events ({eventsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Manage official platform events and participant rosters.</p>
-                </div>
-                <button onClick={() => setShowEventModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" /> Create Official Event
+            <Panel
+              title="Official events"
+              count={eventsList.length}
+              description="Manage official platform events and participant rosters."
+              actions={
+                <button type="button" onClick={() => setShowEventModal(true)} className="btn btn-sm btn-primary min-h-10">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Create official event
                 </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {eventsList.map((ev) => (
-                  <div key={ev._id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 relative">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${ev.status === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>{ev.status}</span>
-                        {ev.isFeatured && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-white">★ FEATURED</span>}
-                      </div>
-                      <button onClick={() => handleDeleteEvent(ev._id)} className="text-rose-500 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm leading-snug">{ev.title}</h4>
-                    <p className="text-xs text-slate-600 line-clamp-2">{ev.description}</p>
-                    <div className="text-[10px] text-slate-500 space-y-0.5 pt-2 border-t">
-                      <p>📅 {new Date(ev.date).toLocaleDateString()} • 🕒 {ev.startTime} - {ev.endTime}</p>
-                      <p>📍 {ev.location}</p>
-                      <p className="font-bold text-slate-700">👥 {ev.joinedUsers?.length || 0} / {ev.maxParticipants} Registered</p>
-                    </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <button onClick={() => handleFeatureEvent(ev)} className={`text-[10px] font-bold px-2 py-1 rounded ${ev.isFeatured ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}>
-                        {ev.isFeatured ? '★ Featured' : '☆ Feature'}
-                      </button>
-                      {ev.status !== 'CANCELLED' && (
-                        <button onClick={() => handleCancelEvent(ev._id)} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-800 text-white hover:bg-slate-900">
-                          Cancel Event
+              }
+            >
+              {eventsList.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+                  {eventsList.map((ev) => (
+                    <article key={ev._id} className="card card-hover flex flex-col gap-3 p-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusChip status={ev.status} />
+                          {ev.isFeatured && (
+                            <span className="chip bg-marigold-tint text-marigold-text">
+                              <Star className="h-3 w-3 fill-current" aria-hidden="true" /> Featured
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEvent(ev._id)}
+                          aria-label={`Delete event ${ev.title}`}
+                          className="-mr-2 -mt-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-brand-tint hover:text-brand"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold leading-snug text-ink">{ev.title}</h3>
+                        <p className="mt-1 line-clamp-2 text-sm text-muted">{ev.description}</p>
+                      </div>
+                      <ul className="space-y-1.5 border-t border-sand pt-3 text-sm text-ink-soft">
+                        <li className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                          {new Date(ev.date).toLocaleDateString()}
+                          <span className="text-muted">·</span>
+                          <Clock className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                          {ev.startTime} – {ev.endTime}
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                          <span className="truncate">{ev.location}</span>
+                        </li>
+                        <li className="flex items-center gap-2 font-semibold text-ink">
+                          <Users className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                          {ev.joinedUsers?.length || 0} / {ev.maxParticipants} registered
+                        </li>
+                      </ul>
+                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                        <FeatureButton featured={ev.isFeatured} onClick={() => handleFeatureEvent(ev)} />
+                        {ev.status !== 'CANCELLED' && (
+                          <button type="button" onClick={() => handleCancelEvent(ev._id)} className={BTN_GHOST}>
+                            <Ban className="h-3.5 w-3.5" aria-hidden="true" /> Cancel event
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyBlock
+                  icon={Calendar}
+                  action={
+                    <button type="button" onClick={() => setShowEventModal(true)} className="btn btn-sm btn-primary min-h-10">
+                      <Plus className="h-4 w-4" aria-hidden="true" /> Create the first event
+                    </button>
+                  }
+                >
+                  No official events yet.
+                </EmptyBlock>
+              )}
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 6: REPORTS MODERATION */}
           {/* ========================================================================= */}
           {activeTab === 'reports' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Community Safety & Moderation Reports ({reportsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Review reported items and enforce community safety rules.</p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Report Target</th>
-                      <th className="p-3">Reason</th>
-                      <th className="p-3">Reporter</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3 text-right">Moderation Action</th>
+            <Panel title="Safety & moderation reports" count={reportsList.length} description="Review reported items and enforce community safety rules.">
+              <DataTable head={['Reported item', 'Reason', 'Reporter', 'Date', { label: 'Moderation action', right: true }]} minWidth="min-w-[1000px]">
+                {reportsList.length > 0 ? (
+                  reportsList.map((rep) => (
+                    <tr key={rep._id} className={ROW}>
+                      <td className={TD_TEXT}>
+                        <span className="chip mb-1 bg-brand-tint text-brand">{rep.targetType}</span>
+                        <p className="line-clamp-2 font-semibold text-ink">{rep.targetDoc?.title || rep.targetDoc?.content || rep.targetId}</p>
+                      </td>
+                      <td className={`${TD_TEXT} font-medium text-brand`}><span className="line-clamp-2">{rep.reason}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{rep.reporter?.name || 'Member'}</td>
+                      <td className={`${TD} whitespace-nowrap text-muted`}>{new Date(rep.createdAt).toLocaleDateString()}</td>
+                      <td className={TD}>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <button type="button" onClick={() => handleResolveReport(rep._id, 'DISMISS')} className={BTN_GHOST}>Dismiss</button>
+                          <button type="button" onClick={() => handleResolveReport(rep._id, 'WARN_USER', 'Please review community guidelines')} className="btn btn-sm min-h-10 bg-marigold-tint text-marigold-text hover:bg-[#F8E3BC]">Warn</button>
+                          <button type="button" onClick={() => handleResolveReport(rep._id, 'REMOVE_CONTENT')} className={BTN_DANGER}>Remove content</button>
+                          <button type="button" onClick={() => handleResolveReport(rep._id, 'SUSPEND_USER', 'Repeated reported safety violations')} className="btn btn-sm min-h-10 bg-ink text-white hover:bg-ink-soft">Suspend</button>
+                          <button type="button" onClick={() => { if (window.confirm('Permanently BAN this user? This blocks all access.')) handleResolveReport(rep._id, 'BAN_USER', 'Severe or repeated policy violations'); }} className="btn btn-sm btn-primary min-h-10">
+                            <Ban className="h-3.5 w-3.5" aria-hidden="true" /> Ban
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {reportsList.length > 0 ? (
-                      reportsList.map((rep) => (
-                        <tr key={rep._id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-800">
-                            <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold mr-2">{rep.targetType}</span>
-                            {rep.targetDoc?.title || rep.targetDoc?.content || rep.targetId}
-                          </td>
-                          <td className="p-3 text-rose-700 font-semibold">{rep.reason}</td>
-                          <td className="p-3">{rep.reporter?.name || 'Member'}</td>
-                          <td className="p-3 text-slate-500">{new Date(rep.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3 text-right space-x-1">
-                            <button onClick={() => handleResolveReport(rep._id, 'DISMISS')} className="px-2.5 py-1 rounded bg-slate-200 text-slate-700 font-bold">Dismiss</button>
-                            <button onClick={() => handleResolveReport(rep._id, 'WARN_USER', 'Please review community guidelines')} className="px-2.5 py-1 rounded bg-amber-500 text-white font-bold">Warn</button>
-                            <button onClick={() => handleResolveReport(rep._id, 'REMOVE_CONTENT')} className="px-2.5 py-1 rounded bg-rose-600 text-white font-bold">Remove Content</button>
-                            <button onClick={() => handleResolveReport(rep._id, 'SUSPEND_USER', 'Repeated reported safety violations')} className="px-2.5 py-1 rounded bg-slate-900 text-white font-bold">Suspend</button>
-                            <button onClick={() => { if (window.confirm('Permanently BAN this user? This blocks all access.')) handleResolveReport(rep._id, 'BAN_USER', 'Severe or repeated policy violations'); }} className="px-2.5 py-1 rounded bg-red-900 text-white font-bold">Ban</button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold">No active safety reports pending review!</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>No safety reports are waiting for review.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 7: COMMENTS CONTROL */}
           {/* ========================================================================= */}
           {activeTab === 'comments' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Comments Moderation ({commentsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Monitor and delete abusive or spam comments.</p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Comment Content</th>
-                      <th className="p-3">Author</th>
-                      <th className="p-3">Post</th>
-                      <th className="p-3 text-right">Actions</th>
+            <Panel title="Comments moderation" count={commentsList.length} description="Monitor and remove abusive or spam comments.">
+              <DataTable head={['Comment', 'Author', 'Post', { label: 'Actions', right: true }]}>
+                {commentsList.length > 0 ? (
+                  commentsList.map((com) => (
+                    <tr key={com._id} className={ROW}>
+                      <td className={`${TD_TEXT} text-ink`}><span className="line-clamp-2" title={com.content}>{com.content}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{com.author?.name || 'Member'}</td>
+                      <td className={`${TD_TEXT} text-muted`}><span className="line-clamp-2">{com.post?.title || 'Post'}</span></td>
+                      <td className={TD}>
+                        <div className="flex justify-end">
+                          <button type="button" onClick={() => handleDeleteComment(com._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {commentsList.map((com) => (
-                      <tr key={com._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-semibold text-slate-800 max-w-sm truncate">{com.content}</td>
-                        <td className="p-3">{com.author?.name || 'Member'}</td>
-                        <td className="p-3 text-slate-500">{com.post?.title || 'Post'}</td>
-                        <td className="p-3 text-right">
-                          <button onClick={() => handleDeleteComment(com._id)} className="px-2.5 py-1 rounded bg-rose-100 text-rose-700 font-bold hover:bg-rose-200">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={4}>No comments to moderate.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 8: MEMBERS DIRECTORY */}
           {/* ========================================================================= */}
           {activeTab === 'members' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Members Directory ({membersList.length})</h3>
-                  <p className="text-[11px] text-slate-500">View member accounts, roles, verification levels, and suspension status.</p>
-                </div>
-                <button onClick={() => exportCSV(membersList, 'haatemalo_members')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export CSV
+            <Panel
+              title="Members directory"
+              count={membersList.length}
+              description="Accounts, roles, verification levels and suspension status."
+              actions={
+                <button type="button" onClick={() => exportCSV(membersList, 'hateymalo_members')} className={BTN_GHOST}>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
                 </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">User Name & Email</th>
-                      <th className="p-3">Role</th>
-                      <th className="p-3">Member Level</th>
-                      <th className="p-3">Verification</th>
-                      <th className="p-3">Suspension</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {membersList.filter((u) => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())).map((m) => (
-                      <tr key={m._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-900">
-                          <p>{m.name}</p>
-                          <p className="text-[10px] text-slate-400 font-normal">{m.email}</p>
-                        </td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-slate-200 font-bold">{m.role}</span></td>
-                        <td className="p-3 font-semibold">{m.memberLevel}</td>
-                        <td className="p-3">
-                          <button onClick={() => handleVerifyUser(m._id, m.memberLevel, !m.isVerified)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.isVerified ? 'bg-sky-100 text-sky-800' : 'bg-slate-200 text-slate-600'}`}>
-                            {m.isVerified ? 'VERIFIED ✓' : 'UNVERIFIED'}
-                          </button>
-                        </td>
-                        <td className="p-3">
-                          {m.isSuspended ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 font-bold" title={m.suspensionReason}>SUSPENDED ⛔</span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">ACTIVE</span>
+              }
+            >
+              <DataTable head={['Member', 'Role', 'Member level', 'Verification', 'Status', { label: 'Actions', right: true }]} minWidth="min-w-[900px]">
+                {filteredMembers.length > 0 ? (
+                  filteredMembers.map((m) => (
+                    <tr key={m._id} className={ROW}>
+                      <td className={TD}>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={m.name} src={m.profilePicture} size="sm" />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{m.name}</p>
+                            <p className="truncate text-xs text-muted">{m.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={TD}><span className="chip bg-paper-deep text-ink-soft">{m.role}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{m.memberLevel}</td>
+                      <td className={TD}>
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyUser(m._id, m.memberLevel, !m.isVerified)}
+                          title={m.isVerified ? 'Click to remove verification' : 'Click to verify'}
+                          className={`btn btn-sm min-h-10 ${m.isVerified ? 'bg-pine-tint text-pine hover:bg-[#D5E7DD]' : 'btn-ghost text-muted'}`}
+                        >
+                          {m.isVerified ? <><BadgeCheck className="h-4 w-4" aria-hidden="true" /> Verified</> : 'Unverified'}
+                        </button>
+                      </td>
+                      <td className={TD}>
+                        {m.isSuspended ? (
+                          <span className="chip bg-brand-tint text-brand" title={m.suspensionReason}>
+                            <Ban className="h-3 w-3" aria-hidden="true" /> Suspended
+                          </span>
+                        ) : (
+                          <span className="chip bg-pine-tint text-pine">Active</span>
+                        )}
+                      </td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          {isSuperAdmin && m.role === 'USER' && (
+                            <button type="button" onClick={() => openAccessEditor(m)} className={BTN_GHOST} title="Give this member moderator or admin access">
+                              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Make staff
+                            </button>
                           )}
-                        </td>
-                        <td className="p-3 text-right space-x-1">
-                          <button onClick={() => setSuspendingUser(m)} className="px-2 py-1 rounded bg-amber-100 text-amber-800 font-bold">
+                          <button type="button" onClick={() => setSuspendingUser(m)} className="btn btn-sm min-h-10 bg-marigold-tint text-marigold-text hover:bg-[#F8E3BC]">
                             {m.isSuspended ? 'Unsuspend' : 'Suspend'}
                           </button>
-                          <button onClick={() => handleDeleteUser(m._id)} className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          {can('canDeleteUsers') && (<button type="button" onClick={() => handleDeleteUser(m._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={6}>{membersList.length > 0 ? 'No members match this search.' : 'No members found.'}</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 9: ORGANIZATIONS */}
           {/* ========================================================================= */}
           {activeTab === 'orgs' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">NGOs & Partner Organizations Management</h3>
-                  <p className="text-[11px] text-slate-500">Register new institutions, verify NGO credentials, and audit partner drives.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => exportCSV(membersList.filter((u) => u.memberLevel === 'ORGANIZATION'), 'haatemalo_organizations')} className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-200">
-                    <Download className="w-3.5 h-3.5" /> Export CSV
+            <Panel
+              title="NGOs & partner organizations"
+              description="Register institutions, verify NGO credentials and review partner profiles."
+              actions={
+                <>
+                  <button type="button" onClick={() => exportCSV(membersList.filter((u) => u.memberLevel === 'ORGANIZATION'), 'hateymalo_organizations')} className={BTN_GHOST}>
+                    <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
                   </button>
-                  <button onClick={() => setShowOrgModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5 shadow-md">
-                    <Plus className="w-4 h-4" /> Add Organization
-                  </button>
-                </div>
+                  {can('canManageOrganizations') && (<button type="button" onClick={() => setShowOrgModal(true)} className="btn btn-sm btn-primary min-h-10">
+                    <Plus className="h-4 w-4" aria-hidden="true" /> Add organization
+                  </button>)}
+                </>
+              }
+            >
+              <div className="border-b border-sand px-5 py-4">
+                <SearchField id="orgs-search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search organization name or email…" />
               </div>
-
-              {/* Search */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-grow max-w-sm">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search org name, email, location..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Organizations Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Organization Name & Contact</th>
-                      <th className="p-3">Reg No / Type</th>
-                      <th className="p-3">Location</th>
-                      <th className="p-3">Verification</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {membersList
-                      .filter((u) => u.memberLevel === 'ORGANIZATION')
-                      .filter((org) => !searchQuery || org.name?.toLowerCase().includes(searchQuery.toLowerCase()) || org.email?.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((org) => (
-                        <tr key={org._id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-900">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold shrink-0">
-                                <Building2 className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <Link to={`/profile/${org._id}`} target="_blank" className="hover:underline hover:text-[#C8382C] flex items-center gap-1">
-                                  {org.name} <ExternalLink className="w-3 h-3 text-slate-400" />
-                                </Link>
-                                <p className="text-[10px] text-slate-500 font-normal">{org.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono font-bold text-[10px]">
-                              {org.orgDetails?.regNumber || 'REG-ACTIVE'}
-                            </span>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{org.orgDetails?.orgType || 'NGO'}</p>
-                          </td>
-                          <td className="p-3 text-slate-700">{org.location || 'Nepal'}</td>
-                          <td className="p-3">
-                            <button onClick={() => handleVerifyUser(org._id, 'ORGANIZATION', !org.isVerified)} className={`px-2.5 py-1 rounded text-[10px] font-bold ${org.isVerified ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
-                              {org.isVerified ? 'VERIFIED NGO ✓' : 'VERIFY ORG'}
-                            </button>
-                          </td>
-                          <td className="p-3 text-right space-x-1">
-                            <Link to={`/profile/${org._id}`} target="_blank" className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold inline-block">
-                              View
+              <DataTable head={['Organization', 'Reg no. / type', 'Location', 'Verification', { label: 'Actions', right: true }]} minWidth="min-w-[860px]">
+                {filteredOrgs.length > 0 ? (
+                  filteredOrgs.map((org) => (
+                    <tr key={org._id} className={ROW}>
+                      <td className={TD}>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={org.name} src={org.profilePicture} size="sm" rounded="rounded-xl" />
+                          <div className="min-w-0">
+                            <Link to={`/profile/${org._id}`} target="_blank" className="flex items-center gap-1 font-semibold text-ink hover:text-brand hover:underline">
+                              {org.name} <ExternalLink className="h-3 w-3 text-muted" aria-hidden="true" />
                             </Link>
-                            <button onClick={() => handleDeleteUser(org._id)} className="px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold">
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                            <p className="truncate text-xs text-muted">{org.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={TD}>
+                        <span className="chip bg-paper-deep font-mono text-ink-soft">{org.orgDetails?.regNumber || 'REG-ACTIVE'}</span>
+                        <p className="mt-0.5 text-xs text-muted">{org.orgDetails?.orgType || 'NGO'}</p>
+                      </td>
+                      <td className={`${TD} text-ink-soft`}>{org.location || 'Nepal'}</td>
+                      <td className={TD}>
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyUser(org._id, 'ORGANIZATION', !org.isVerified)}
+                          className={`btn btn-sm min-h-10 ${org.isVerified ? 'bg-pine-tint text-pine hover:bg-[#D5E7DD]' : 'bg-marigold-tint text-marigold-text hover:bg-[#F8E3BC]'}`}
+                        >
+                          {org.isVerified ? <><BadgeCheck className="h-4 w-4" aria-hidden="true" /> Verified NGO</> : <><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Verify org</>}
+                        </button>
+                      </td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          <Link to={`/profile/${org._id}`} target="_blank" className={BTN_GHOST}>View</Link>
+                          {can('canDeleteUsers') && (<button type="button" onClick={() => handleDeleteUser(org._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>{searchQuery ? 'No organizations match this search.' : 'No organizations registered yet.'}</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 10: VOLUNTEERS */}
           {/* ========================================================================= */}
           {activeTab === 'volunteers' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Volunteers Roster & Tier Management</h3>
-                  <p className="text-[11px] text-slate-500">Manage volunteer levels, assign civic badges, verify credentials, and review activity logs.</p>
-                </div>
-                <button onClick={() => exportCSV(membersList.filter((u) => u.role === 'USER'), 'haatemalo_volunteers')} className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-200">
-                  <Download className="w-3.5 h-3.5" /> Export Volunteers CSV
+            <Panel
+              title="Volunteers & tiers"
+              description="Manage volunteer levels and verify credentials."
+              actions={
+                <button type="button" onClick={() => exportCSV(membersList.filter((u) => u.role === 'USER'), 'hateymalo_volunteers')} className={BTN_GHOST}>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Export volunteers CSV
                 </button>
-              </div>
-
-              {/* Search & Tier Filter */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-grow max-w-sm">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search volunteer name, email, skills..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
+              }
+            >
+              <div className="flex flex-col gap-3 border-b border-sand px-5 py-4 sm:flex-row sm:items-center">
+                <SearchField id="volunteers-search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search volunteer name or email…" />
+                <label htmlFor="volunteer-tier-filter" className="sr-only">Filter by volunteer tier</label>
                 <select
+                  id="volunteer-tier-filter"
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none font-semibold cursor-pointer"
+                  className="field sm:!w-auto"
                 >
-                  <option value="All">All Volunteer Tiers</option>
+                  <option value="All">All volunteer tiers</option>
                   <option value="VOLUNTEER">Volunteer</option>
                   <option value="SENIOR_VOLUNTEER">Senior Volunteer</option>
                   <option value="COMMUNITY_LEAD">Community Lead</option>
                   <option value="MEMBER">General Member</option>
                 </select>
               </div>
-
-              {/* Volunteers Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Volunteer Name & Email</th>
-                      <th className="p-3">Location</th>
-                      <th className="p-3">Volunteer Tier Level</th>
-                      <th className="p-3">Verification</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {membersList
-                      .filter((u) => u.role === 'USER')
-                      .filter((vol) => filterCategory === 'All' || vol.memberLevel === filterCategory)
-                      .filter((vol) => !searchQuery || vol.name?.toLowerCase().includes(searchQuery.toLowerCase()) || vol.email?.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((vol) => (
-                        <tr key={vol._id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-900">
-                            <div className="flex items-center gap-2.5">
-                              <img
-                                src={vol.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-                                alt={vol.name}
-                                className="w-8 h-8 rounded-xl object-cover border border-slate-200 shrink-0"
-                              />
-                              <div>
-                                <Link to={`/profile/${vol._id}`} target="_blank" className="hover:underline hover:text-[#C8382C] flex items-center gap-1">
-                                  {vol.name} <ExternalLink className="w-3 h-3 text-slate-400" />
-                                </Link>
-                                <p className="text-[10px] text-slate-500 font-normal">{vol.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-3 text-slate-700">{vol.location || 'Nepal'}</td>
-                          <td className="p-3">
-                            <select
-                              value={vol.memberLevel || 'MEMBER'}
-                              onChange={(e) => handleVerifyUser(vol._id, e.target.value, vol.isVerified)}
-                              className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
-                            >
-                              <option value="MEMBER">Member</option>
-                              <option value="VOLUNTEER">Volunteer 🤝</option>
-                              <option value="SENIOR_VOLUNTEER">Senior Volunteer ⭐</option>
-                              <option value="COMMUNITY_LEAD">Community Lead 👑</option>
-                            </select>
-                          </td>
-                          <td className="p-3">
-                            <button onClick={() => handleVerifyUser(vol._id, vol.memberLevel, !vol.isVerified)} className={`px-2.5 py-1 rounded text-[10px] font-bold ${vol.isVerified ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
-                              {vol.isVerified ? 'VERIFIED ✓' : 'VERIFY'}
-                            </button>
-                          </td>
-                          <td className="p-3 text-right space-x-1">
-                            <Link to={`/profile/${vol._id}`} target="_blank" className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold inline-block">
-                              Profile
+              <DataTable head={['Volunteer', 'Location', 'Tier level', 'Verification', { label: 'Actions', right: true }]} minWidth="min-w-[860px]">
+                {filteredVolunteers.length > 0 ? (
+                  filteredVolunteers.map((vol) => (
+                    <tr key={vol._id} className={ROW}>
+                      <td className={TD}>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={vol.name} src={vol.profilePicture} size="sm" />
+                          <div className="min-w-0">
+                            <Link to={`/profile/${vol._id}`} target="_blank" className="flex items-center gap-1 font-semibold text-ink hover:text-brand hover:underline">
+                              {vol.name} <ExternalLink className="h-3 w-3 text-muted" aria-hidden="true" />
                             </Link>
-                            <button onClick={() => handleDeleteUser(vol._id)} className="px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold">
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                            <p className="truncate text-xs text-muted">{vol.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={`${TD} text-ink-soft`}>{vol.location || 'Nepal'}</td>
+                      <td className={TD}>
+                        <label htmlFor={`tier-${vol._id}`} className="sr-only">Tier level for {vol.name}</label>
+                        <select
+                          id={`tier-${vol._id}`}
+                          value={vol.memberLevel || 'MEMBER'}
+                          onChange={(e) => handleVerifyUser(vol._id, e.target.value, vol.isVerified)}
+                          className="field !w-auto !py-2 !text-xs"
+                        >
+                          <option value="MEMBER">Member</option>
+                          <option value="VOLUNTEER">Volunteer</option>
+                          <option value="SENIOR_VOLUNTEER">Senior Volunteer</option>
+                          <option value="COMMUNITY_LEAD">Community Lead</option>
+                        </select>
+                      </td>
+                      <td className={TD}>
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyUser(vol._id, vol.memberLevel, !vol.isVerified)}
+                          className={`btn btn-sm min-h-10 ${vol.isVerified ? 'bg-pine-tint text-pine hover:bg-[#D5E7DD]' : 'btn-ghost text-muted'}`}
+                        >
+                          {vol.isVerified ? <><BadgeCheck className="h-4 w-4" aria-hidden="true" /> Verified</> : 'Verify'}
+                        </button>
+                      </td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
+                          <Link to={`/profile/${vol._id}`} target="_blank" className={BTN_GHOST}>Profile</Link>
+                          {can('canDeleteUsers') && (<button type="button" onClick={() => handleDeleteUser(vol._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>No volunteers match this search or tier.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 11: DYNAMIC CATEGORIES */}
           {/* ========================================================================= */}
           {activeTab === 'categories' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Dynamic Activity Categories ({categoriesList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Categories added here dynamically appear on public post/blog forms.</p>
-                </div>
-                <button onClick={() => setShowCategoryModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" /> Add Category
+            <Panel
+              title="Activity categories"
+              count={categoriesList.length}
+              description="Categories added here appear on the public post and blog forms."
+              actions={
+                <button type="button" onClick={() => setShowCategoryModal(true)} className="btn btn-sm btn-primary min-h-10">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Add category
                 </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {categoriesList.map((cat) => (
-                  <div key={cat._id} className={`p-4 rounded-xl border flex items-center justify-between ${cat.isActive === false ? 'border-slate-200 bg-slate-100 opacity-70' : 'border-slate-200 bg-slate-50'}`}>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-900 text-sm">{cat.name}</h4>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${cat.isActive === false ? 'bg-slate-300 text-slate-700' : 'bg-emerald-100 text-emerald-800'}`}>
-                          {cat.isActive === false ? 'INACTIVE' : 'ACTIVE'}
-                        </span>
+              }
+            >
+              {categoriesList.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+                  {categoriesList.map((cat) => (
+                    <div key={cat._id} className={`flex items-center justify-between gap-3 rounded-2xl border border-sand p-4 ${cat.isActive === false ? 'bg-paper opacity-75' : 'bg-white'}`}>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-bold text-ink">{cat.name}</h3>
+                          <span className={`chip ${cat.isActive === false ? 'bg-paper-deep text-muted' : 'bg-pine-tint text-pine'}`}>
+                            {cat.isActive === false ? 'Inactive' : 'Active'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-sm text-muted">{cat.description || 'Activity Category'}</p>
                       </div>
-                      <p className="text-xs text-slate-500">{cat.description || 'Activity Category'}</p>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategoryActive(cat)}
+                          className={cat.isActive === false ? BTN_APPROVE : BTN_GHOST}
+                        >
+                          {cat.isActive === false ? 'Activate' : 'Deactivate'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat._id)}
+                          aria-label={`Delete category ${cat.name}`}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-brand-tint hover:text-brand"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => handleToggleCategoryActive(cat)}
-                        className={`text-[10px] font-bold px-2 py-1 rounded ${cat.isActive === false ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                      >
-                        {cat.isActive === false ? 'Activate' : 'Deactivate'}
-                      </button>
-                      <button onClick={() => handleDeleteCategory(cat._id)} className="text-rose-500 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyBlock icon={FolderKanban}>No categories yet.</EmptyBlock>
+              )}
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 12: DONATIONS LEDGER */}
           {/* ========================================================================= */}
           {activeTab === 'donations' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Voluntary Donations Financial Ledger ({donationsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Audit all incoming voluntary contributions across eSewa/Khalti.</p>
-                </div>
-                <button onClick={() => exportCSV(donationsList, 'haatemalo_donations')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export Ledger CSV
+            <Panel
+              title="Donations ledger"
+              count={donationsList.length}
+              description="Audit all incoming voluntary contributions."
+              actions={
+                <button type="button" onClick={() => exportCSV(donationsList, 'hateymalo_donations')} className={BTN_GHOST}>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Export ledger CSV
                 </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Transaction ID</th>
-                      <th className="p-3">Donor Name</th>
-                      <th className="p-3">Amount (NPR)</th>
-                      <th className="p-3">Payment Method</th>
-                      <th className="p-3">Type</th>
-                      <th className="p-3">Date</th>
+              }
+            >
+              <DataTable head={['Transaction ID', 'Donor', 'Amount (NPR)', 'Payment method', 'Type', 'Date']} minWidth="min-w-[820px]">
+                {donationsList.length > 0 ? (
+                  donationsList.map((d) => (
+                    <tr key={d._id} className={ROW}>
+                      <td className={`${TD} font-mono text-xs text-ink-soft`}>{d.transactionId}</td>
+                      <td className={`${TD} font-medium text-ink`}>{d.donor?.name || 'Anonymous Donor'}</td>
+                      <td className={`${TD} whitespace-nowrap font-bold tabular-nums text-pine`}>Rs. {d.amount.toLocaleString()}</td>
+                      <td className={TD}><span className="chip bg-sky-tint text-sky-ink">{d.paymentMethod}</span></td>
+                      <td className={`${TD} text-ink-soft`}>{d.type}</td>
+                      <td className={`${TD} whitespace-nowrap text-muted`}>{new Date(d.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {donationsList.map((d) => (
-                      <tr key={d._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-mono font-bold text-slate-800">{d.transactionId}</td>
-                        <td className="p-3 font-semibold">{d.donor?.name || 'Anonymous Donor'}</td>
-                        <td className="p-3 font-black text-emerald-700">Rs. {d.amount.toLocaleString()}</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">{d.paymentMethod}</span></td>
-                        <td className="p-3 font-bold">{d.type}</td>
-                        <td className="p-3 text-slate-500">{new Date(d.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={6}>No donations recorded yet.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 13: CAMPAIGNS */}
           {/* ========================================================================= */}
           {activeTab === 'campaigns' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Fundraising Campaigns ({campaignsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Manage campaign targets, collected funds, and status.</p>
+            <Panel
+              title="Fundraising campaigns"
+              count={campaignsList.length}
+              description="Manage campaign targets, collected funds and status."
+              actions={
+                can('canManageDonations') && (<button type="button" onClick={() => setShowCampaignModal(true)} className="btn btn-sm btn-primary min-h-10">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Launch campaign
+                </button>)
+              }
+            >
+              {campaignsList.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+                  {campaignsList.map((c) => {
+                    const pct = c.goalAmount > 0 ? Math.min(100, Math.round(((c.raisedAmount || 0) / c.goalAmount) * 100)) : 0;
+                    return (
+                      <article key={c._id} className="card card-hover flex flex-col gap-3 p-5">
+                        <div className="flex items-center justify-between gap-2">
+                          <StatusChip status={c.status} />
+                          {can('canManageDonations') && (<button
+                            type="button"
+                            onClick={() => handleDeleteCampaign(c._id)}
+                            aria-label={`Delete campaign ${c.title}`}
+                            className="-mr-2 -mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-brand-tint hover:text-brand"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>)}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold leading-snug text-ink">{c.title}</h3>
+                          <p className="mt-1 line-clamp-2 text-sm text-muted">{c.description}</p>
+                        </div>
+                        <div className="mt-auto border-t border-sand pt-3">
+                          <div className="progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`${pct}% of goal raised`}>
+                            <div className="progress-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="mt-2 text-sm text-ink-soft">
+                            <span className="font-bold text-pine">Rs. {c.raisedAmount.toLocaleString()}</span> raised of Rs. {c.goalAmount.toLocaleString()}
+                          </p>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-                <button onClick={() => setShowCampaignModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" /> Launch Campaign
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {campaignsList.map((c) => (
-                  <div key={c._id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[9px]">{c.status}</span>
-                      <button onClick={() => handleDeleteCampaign(c._id)} className="text-rose-500 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm">{c.title}</h4>
-                    <p className="text-xs text-slate-600 line-clamp-2">{c.description}</p>
-                    <div className="text-xs font-bold text-slate-800 pt-2 border-t">
-                      Raised: <span className="text-emerald-700">Rs. {c.raisedAmount.toLocaleString()}</span> / Goal: Rs. {c.goalAmount.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+              ) : (
+                <EmptyBlock
+                  icon={Megaphone}
+                  action={
+                    can('canManageDonations') && (<button type="button" onClick={() => setShowCampaignModal(true)} className="btn btn-sm btn-primary min-h-10">
+                      <Plus className="h-4 w-4" aria-hidden="true" /> Launch a campaign
+                    </button>)
+                  }
+                >
+                  No fundraising campaigns yet.
+                </EmptyBlock>
+              )}
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 14: EXPENSES & RECEIPTS */}
           {/* ========================================================================= */}
           {activeTab === 'expenses' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Expenses Transparency Ledger ({expensesList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Track itemized expenditure records logged for fundraising campaigns.</p>
-                </div>
-                <button onClick={() => setShowExpenseModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" /> Log Expense Record
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Expense Title</th>
-                      <th className="p-3">Campaign</th>
-                      <th className="p-3">Amount (NPR)</th>
-                      <th className="p-3">Spent Date</th>
-                      <th className="p-3 text-right">Action</th>
+            <Panel
+              title="Expenses transparency ledger"
+              count={expensesList.length}
+              description="Itemized expenditure records logged against fundraising campaigns."
+              actions={
+                can('canManageDonations') && (<button type="button" onClick={() => { setShowExpenseModal(true); fetchTabData('campaigns'); }} className="btn btn-sm btn-primary min-h-10">
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Log expense
+                </button>)
+              }
+            >
+              <DataTable head={['Expense', 'Campaign', 'Amount (NPR)', 'Spent on', { label: 'Action', right: true }]}>
+                {expensesList.length > 0 ? (
+                  expensesList.map((exp) => (
+                    <tr key={exp._id} className={ROW}>
+                      <td className={`${TD_TEXT} font-semibold text-ink`}><span className="line-clamp-2">{exp.title}</span></td>
+                      <td className={`${TD_TEXT} text-ink-soft`}><span className="line-clamp-2">{exp.campaign?.title || 'General Campaign'}</span></td>
+                      <td className={`${TD} whitespace-nowrap font-bold tabular-nums text-brand`}>Rs. {exp.amount.toLocaleString()}</td>
+                      <td className={`${TD} whitespace-nowrap text-muted`}>{new Date(exp.spentDate).toLocaleDateString()}</td>
+                      <td className={TD}>
+                        <div className="flex justify-end">
+                          {can('canManageDonations') && (<button type="button" onClick={() => handleDeleteExpense(exp._id)} className={BTN_DANGER}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                          </button>)}
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {expensesList.map((exp) => (
-                      <tr key={exp._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-800">{exp.title}</td>
-                        <td className="p-3">{exp.campaign?.title || 'General Campaign'}</td>
-                        <td className="p-3 font-black text-rose-700">Rs. {exp.amount.toLocaleString()}</td>
-                        <td className="p-3 text-slate-500">{new Date(exp.spentDate).toLocaleDateString()}</td>
-                        <td className="p-3 text-right">
-                          <button onClick={() => handleDeleteExpense(exp._id)} className="px-2.5 py-1 rounded bg-rose-100 text-rose-700 font-bold">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>No expenses logged yet.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 15: ADMINS & RBAC */}
           {/* ========================================================================= */}
           {activeTab === 'admins' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Admin Staff & Role-Based Access Control (RBAC)</h3>
-                  <p className="text-[11px] text-slate-500">Assign granular administrative permissions to staff moderators.</p>
-                </div>
-                <button onClick={() => setShowStaffModal(true)} className="px-3.5 py-1.5 rounded-xl bg-[#94201B] text-white text-xs font-bold flex items-center gap-1.5">
-                  <UserPlus className="w-4 h-4" /> Add Admin Staff
+            <Panel
+              title="Admin staff & roles"
+              description="Choose exactly what each admin or moderator can see and do. Finance access is never given by default."
+              actions={
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const catalog = await loadAccessCatalog();
+                    setStaffForm((f) => ({ ...f, permissions: presetFor(f.role, catalog) }));
+                    setShowStaffModal(true);
+                  }}
+                  className="btn btn-sm btn-primary min-h-10"
+                >
+                  <UserPlus className="h-4 w-4" aria-hidden="true" /> Add staff
                 </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Staff Name & Email</th>
-                      <th className="p-3">Assigned Role</th>
-                      <th className="p-3">Granular Permissions</th>
-                      <th className="p-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {membersList.filter((u) => ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(u.role)).map((admin) => (
-                      <tr key={admin._id} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-900">
-                          <p>{admin.name}</p>
-                          <p className="text-[10px] text-slate-400 font-normal">{admin.email}</p>
-                        </td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">{admin.role}</span></td>
-                        <td className="p-3 max-w-xs truncate text-slate-600 font-mono text-[10px]">
-                          {admin.permissions?.length > 0 ? admin.permissions.join(', ') : 'FULL_SUPER_ACCESS'}
-                        </td>
-                        <td className="p-3 text-right">
+              }
+            >
+              <DataTable head={['Staff member', 'Role', 'Permissions', { label: 'Action', right: true }]}>
+                {staffList.length > 0 ? (
+                  staffList.map((admin) => (
+                    <tr key={admin._id} className={ROW}>
+                      <td className={TD}>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={admin.name} src={admin.profilePicture} size="sm" />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{admin.name}</p>
+                            <p className="truncate text-xs text-muted">{admin.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={TD}><span className="chip bg-brand-tint text-brand">{admin.role.replace('_', ' ')}</span></td>
+                      <td className={TD_TEXT}>
+                        {admin.role === 'SUPER_ADMIN' ? (
+                          <span className="chip bg-pine-tint text-pine">Full access</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(admin.permissions?.length ? admin.permissions : presetFor(admin.role)).map((p) => (
+                              <span
+                                key={p}
+                                className={`chip ${['canViewDonations', 'canManageDonations'].includes(p) ? 'bg-marigold-tint text-marigold-text' : 'bg-paper-deep text-ink-soft'}`}
+                              >
+                                {permissionLabel(p)}
+                              </span>
+                            ))}
+                            {!admin.permissions?.length && <span className="text-xs text-muted">(role default)</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className={TD}>
+                        <div className="flex justify-end gap-2">
                           {admin.role !== 'SUPER_ADMIN' && (
-                            <button onClick={() => handleDeleteStaff(admin._id)} className="px-2.5 py-1 rounded bg-rose-100 text-rose-700 font-bold">Remove Access</button>
+                            <>
+                              <button type="button" onClick={() => openAccessEditor(admin)} className={BTN_GHOST}>
+                                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Edit access
+                              </button>
+                              <button type="button" onClick={() => handleDeleteStaff(admin._id)} className={BTN_DANGER}>Remove</button>
+                            </>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={4}>No staff accounts found.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 16: PLATFORM SETTINGS */}
           {/* ========================================================================= */}
           {activeTab === 'settings' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-6 flex-1 max-w-3xl">
-              <div className="border-b pb-3">
-                <h3 className="text-sm font-black text-slate-900">Platform Settings & CMS Controls</h3>
-                <p className="text-[11px] text-slate-500">Configure public platform behavior, approval rules, and homepage headline.</p>
-              </div>
+            <div className="max-w-3xl">
+              <Panel title="Platform settings" description="Public platform identity, donation details and moderation rules.">
+                <form onSubmit={handleSaveSettings} className="space-y-8 p-5 sm:p-6">
+                  <fieldset className="space-y-4">
+                    <legend className="eyebrow mb-1">General</legend>
+                    <div>
+                      <label htmlFor="set-platformName" className="field-label">Platform name</label>
+                      <input id="set-platformName" type="text" value={settingsData.platformName || 'हातेमालो (HATEYMALO)'} onChange={(e) => setSettingsData({ ...settingsData, platformName: e.target.value })} className="field" />
+                    </div>
+                    <div>
+                      <label htmlFor="set-tagline" className="field-label">Tagline</label>
+                      <input id="set-tagline" type="text" value={settingsData.tagline || 'मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।'} onChange={(e) => setSettingsData({ ...settingsData, tagline: e.target.value })} className="field deva" />
+                    </div>
+                    <div>
+                      <label htmlFor="set-contactEmail" className="field-label">Contact email</label>
+                      <input id="set-contactEmail" type="email" value={settingsData.contactEmail || 'admin@hateymalo.com'} onChange={(e) => setSettingsData({ ...settingsData, contactEmail: e.target.value })} className="field" />
+                    </div>
+                  </fieldset>
 
-              <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Platform Name</label>
-                  <input type="text" value={settingsData.platformName || 'हातेमालो (HAATEMALO)'} onChange={(e) => setSettingsData({ ...settingsData, platformName: e.target.value })} className="w-full border rounded-lg p-2.5 outline-none font-bold" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Tagline</label>
-                  <input type="text" value={settingsData.tagline || 'मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।'} onChange={(e) => setSettingsData({ ...settingsData, tagline: e.target.value })} className="w-full border rounded-lg p-2.5 outline-none font-bold" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Contact Email</label>
-                  <input type="email" value={settingsData.contactEmail || 'admin@haatemalo.org'} onChange={(e) => setSettingsData({ ...settingsData, contactEmail: e.target.value })} className="w-full border rounded-lg p-2.5 outline-none font-bold" />
-                </div>
+                  <hr className="border-sand" />
 
-                <div className="pt-3 border-t space-y-3">
-                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider text-[#C8382C]">💳 Donation Payment & Static QR Settings</h4>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Static Payment QR Image URL</label>
-                    <input
-                      type="url"
-                      value={settingsData.paymentQrCode || ''}
-                      onChange={(e) => setSettingsData({ ...settingsData, paymentQrCode: e.target.value })}
-                      placeholder="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=HAATEMALO-DONATION-OFFICIAL-QR"
-                      className="w-full border rounded-lg p-2.5 outline-none text-xs font-mono"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">Paste any image URL or eSewa/Khalti/Fonepay QR image link here.</p>
+                  <fieldset className="space-y-4">
+                    <legend className="eyebrow mb-1">Homepage hero</legend>
+                    <p className="-mt-2 text-sm text-muted">Shown at the top of the public homepage. Put each line of the headline on its own line.</p>
+                    <div>
+                      <label htmlFor="set-heroSmallLabel" className="field-label">Small label above the headline</label>
+                      <input id="set-heroSmallLabel" type="text" value={settingsData.heroSmallLabel ?? ''} onChange={(e) => setSettingsData({ ...settingsData, heroSmallLabel: e.target.value })} className="field" />
+                    </div>
+                    <div>
+                      <label htmlFor="set-heroHeadline" className="field-label">Headline</label>
+                      <textarea id="set-heroHeadline" rows={3} value={settingsData.heroHeadline ?? ''} onChange={(e) => setSettingsData({ ...settingsData, heroHeadline: e.target.value })} className="field deva" />
+                    </div>
+                    <div>
+                      <label htmlFor="set-heroDescription" className="field-label">Description</label>
+                      <textarea id="set-heroDescription" rows={3} value={settingsData.heroDescription ?? ''} onChange={(e) => setSettingsData({ ...settingsData, heroDescription: e.target.value })} className="field" />
+                    </div>
+                    <div>
+                      <label htmlFor="set-heroImage" className="field-label">Hero image URL</label>
+                      <input id="set-heroImage" type="url" value={settingsData.heroImage ?? ''} onChange={(e) => setSettingsData({ ...settingsData, heroImage: e.target.value })} placeholder="https://…" className="field font-mono !text-xs" />
+                      {settingsData.heroImage && (
+                        <img src={settingsData.heroImage} alt="Hero image preview" className="mt-3 h-32 w-full max-w-sm rounded-2xl border border-sand object-cover" />
+                      )}
+                    </div>
+                  </fieldset>
+
+                  <hr className="border-sand" />
+
+                  <fieldset className="space-y-4">
+                    <legend className="eyebrow mb-1 flex items-center gap-1.5">
+                      <QrCode className="h-3.5 w-3.5" aria-hidden="true" /> Donation payment & QR
+                    </legend>
+                    <div>
+                      <label htmlFor="set-paymentQrCode" className="field-label">Static payment QR image URL</label>
+                      <input
+                        id="set-paymentQrCode"
+                        type="url"
+                        value={settingsData.paymentQrCode || ''}
+                        onChange={(e) => setSettingsData({ ...settingsData, paymentQrCode: e.target.value })}
+                        placeholder="https://… (link to your official eSewa / Khalti / Fonepay QR image)"
+                        aria-describedby="set-paymentQrCode-hint"
+                        className="field font-mono !text-xs"
+                      />
+                      <p id="set-paymentQrCode-hint" className="mt-1.5 text-sm text-muted">Paste any image URL or eSewa / Khalti / Fonepay QR image link.</p>
+                    </div>
+                    <div>
+                      <label htmlFor="set-paymentInstructions" className="field-label">Payment instructions</label>
+                      <input
+                        id="set-paymentInstructions"
+                        type="text"
+                        value={settingsData.paymentInstructions || ''}
+                        onChange={(e) => setSettingsData({ ...settingsData, paymentInstructions: e.target.value })}
+                        placeholder="Scan with eSewa, Khalti, or Fonepay to make a direct voluntary contribution."
+                        className="field"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="set-paymentPhone" className="field-label">Official mobile / wallet number</label>
+                      <input
+                        id="set-paymentPhone"
+                        type="text"
+                        value={settingsData.paymentPhone || ''}
+                        onChange={(e) => setSettingsData({ ...settingsData, paymentPhone: e.target.value })}
+                        placeholder="Your official wallet or mobile number"
+                        className="field"
+                      />
+                    </div>
+                  </fieldset>
+
+                  <hr className="border-sand" />
+
+                  <fieldset className="space-y-3">
+                    <legend className="eyebrow mb-1">Moderation policies</legend>
+                    <label htmlFor="set-requirePostApproval" className="flex cursor-pointer items-start gap-3 rounded-2xl border border-sand p-4 hover:bg-paper">
+                      <input
+                        id="set-requirePostApproval"
+                        type="checkbox"
+                        checked={settingsData.requirePostApproval ?? true}
+                        onChange={(e) => setSettingsData({ ...settingsData, requirePostApproval: e.target.checked })}
+                        className="mt-1 h-5 w-5 shrink-0 accent-[#B5232C]"
+                      />
+                      <span>
+                        <span className="block font-semibold text-ink">Require approval for posts</span>
+                        <span className="block text-sm text-muted">New help posts stay private until an admin approves them.</span>
+                      </span>
+                    </label>
+                    <label htmlFor="set-requireBlogApproval" className="flex cursor-pointer items-start gap-3 rounded-2xl border border-sand p-4 hover:bg-paper">
+                      <input
+                        id="set-requireBlogApproval"
+                        type="checkbox"
+                        checked={settingsData.requireBlogApproval ?? true}
+                        onChange={(e) => setSettingsData({ ...settingsData, requireBlogApproval: e.target.checked })}
+                        className="mt-1 h-5 w-5 shrink-0 accent-[#B5232C]"
+                      />
+                      <span>
+                        <span className="block font-semibold text-ink">Require approval for blog stories</span>
+                        <span className="block text-sm text-muted">Stories are reviewed before they are published.</span>
+                      </span>
+                    </label>
+                  </fieldset>
+
+                  <hr className="border-sand" />
+
+                  <fieldset className="space-y-3">
+                    <legend className="eyebrow mb-1">Platform features</legend>
+                    {[
+                      { key: 'allowPublicDonations', title: 'Accept public donations', hint: 'Shows the Donate page, campaign contributions and donate buttons across the site.' },
+                      { key: 'allowPublicComments', title: 'Allow public comments', hint: 'Members can comment on help requests, events and stories.' },
+                      { key: 'allowRegistrations', title: 'Allow new member registrations', hint: 'Turn off to pause new sign-ups (existing members can still log in).' },
+                      { key: 'requireOrgVerification', title: 'Require verification for organisations', hint: 'Organisations get the verified badge only after the team checks their details.' },
+                    ].map(({ key, title, hint }) => (
+                      <label key={key} htmlFor={`set-${key}`} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-sand p-4 hover:bg-paper">
+                        <input
+                          id={`set-${key}`}
+                          type="checkbox"
+                          checked={settingsData[key] ?? true}
+                          onChange={(e) => setSettingsData({ ...settingsData, [key]: e.target.checked })}
+                          className="mt-1 h-5 w-5 shrink-0 accent-[#B5232C]"
+                        />
+                        <span>
+                          <span className="block font-semibold text-ink">{title}</span>
+                          <span className="block text-sm text-muted">{hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+
+                  <div className="border-t border-sand pt-6">
+                    <button type="submit" className="btn btn-primary w-full sm:w-auto">
+                      Save platform settings
+                    </button>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Payment Instructions</label>
-                    <input
-                      type="text"
-                      value={settingsData.paymentInstructions || ''}
-                      onChange={(e) => setSettingsData({ ...settingsData, paymentInstructions: e.target.value })}
-                      placeholder="Scan with eSewa, Khalti, or Fonepay to make a direct voluntary contribution."
-                      className="w-full border rounded-lg p-2.5 outline-none text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Official Mobile / Wallet Number</label>
-                    <input
-                      type="text"
-                      value={settingsData.paymentPhone || ''}
-                      onChange={(e) => setSettingsData({ ...settingsData, paymentPhone: e.target.value })}
-                      placeholder="+977 9800000000"
-                      className="w-full border rounded-lg p-2.5 outline-none text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t space-y-2">
-                  <h4 className="font-bold text-slate-800">Moderation Policies & Toggles</h4>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={settingsData.requirePostApproval ?? true} onChange={(e) => setSettingsData({ ...settingsData, requirePostApproval: e.target.checked })} />
-                    <span>Require Admin Approval for Posts before making public</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={settingsData.requireBlogApproval ?? true} onChange={(e) => setSettingsData({ ...settingsData, requireBlogApproval: e.target.checked })} />
-                    <span>Require Admin Approval for Blog Stories</span>
-                  </label>
-                </div>
-
-                <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#94201B] text-white font-bold text-xs shadow-md">
-                  Save Platform Settings & Update QR
-                </button>
-              </form>
+                </form>
+              </Panel>
             </div>
           )}
 
@@ -1938,44 +2320,35 @@ const SuperAdminDashboard = () => {
           {/* TAB 17: SYSTEM AUDIT LOGS */}
           {/* ========================================================================= */}
           {activeTab === 'logs' && (
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4 flex-1">
-              <div className="flex justify-between items-center border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Immutable System Audit Logs ({auditLogsList.length})</h3>
-                  <p className="text-[11px] text-slate-500">Track all administrative changes, deletions, and policy enforcement actions.</p>
-                </div>
-                <button onClick={() => exportCSV(auditLogsList, 'haatemalo_audit_logs')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export Logs CSV
+            <Panel
+              title="System audit logs"
+              count={auditLogsList.length}
+              description="Administrative changes, deletions and policy enforcement actions."
+              actions={
+                <button type="button" onClick={() => exportCSV(auditLogsList, 'hateymalo_audit_logs')} className={BTN_GHOST}>
+                  <Download className="h-4 w-4" aria-hidden="true" /> Export logs CSV
                 </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold border-b">
-                    <tr>
-                      <th className="p-3">Date & Time</th>
-                      <th className="p-3">Admin Performer</th>
-                      <th className="p-3">Action Description</th>
-                      <th className="p-3">Target Type</th>
-                      <th className="p-3">Details</th>
+              }
+            >
+              <DataTable head={['Date & time', 'Performed by', 'Action', 'Target type', 'Details']} minWidth="min-w-[860px]">
+                {auditLogsList.length > 0 ? (
+                  auditLogsList.map((log) => (
+                    <tr key={log._id} className={ROW}>
+                      <td className={`${TD} whitespace-nowrap font-mono text-xs text-muted`}>{new Date(log.createdAt).toLocaleString()}</td>
+                      <td className={`${TD} font-medium text-ink`}>{log.admin?.name || 'System Admin'}</td>
+                      <td className={`${TD_TEXT} font-semibold text-brand`}>{log.action}</td>
+                      <td className={TD}><span className="chip bg-paper-deep font-mono text-ink-soft">{log.targetType}</span></td>
+                      <td className={TD_TEXT}><p className="line-clamp-2 text-xs text-ink-soft" title={log.details || ''}>{log.details || '-'}</p></td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {auditLogsList.map((log) => (
-                      <tr key={log._id} className="hover:bg-slate-50">
-                        <td className="p-3 text-slate-500 font-mono text-[10px]">{new Date(log.createdAt).toLocaleString()}</td>
-                        <td className="p-3 font-bold text-slate-800">{log.admin?.name || 'System Admin'}</td>
-                        <td className="p-3 font-bold text-[#94201B]">{log.action}</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-slate-200 font-mono font-bold text-[9px]">{log.targetType}</span></td>
-                        <td className="p-3 text-slate-600 text-[10px] line-clamp-1">{log.details || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={5}>No audit log entries yet.</EmptyRow>
+                )}
+              </DataTable>
+            </Panel>
           )}
 
+          </div>
         </main>
 
       </div>
@@ -1986,329 +2359,333 @@ const SuperAdminDashboard = () => {
 
       {/* ANNOUNCEMENT MODAL */}
       {showAnnouncementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-md w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Create Platform Announcement</h3>
-              <button onClick={() => setShowAnnouncementModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Create announcement" icon={Megaphone} onClose={() => setShowAnnouncementModal(false)}>
+          <form onSubmit={handleBroadcastAnnouncement} className="space-y-4">
+            <div>
+              <label htmlFor="ann-title" className="field-label">Title</label>
+              <input id="ann-title" type="text" required value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="Announcement title…" className="field" />
             </div>
-            <form onSubmit={handleBroadcastAnnouncement} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Title</label>
-                <input type="text" required value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="Announcement title..." className="w-full border rounded-lg p-2 text-xs outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Message</label>
-                <textarea rows={3} required value={annContent} onChange={(e) => setAnnContent(e.target.value)} placeholder="Message content..." className="w-full border rounded-lg p-2 text-xs outline-none" />
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Broadcast Announcement
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="ann-content" className="field-label">Message</label>
+              <textarea id="ann-content" rows={4} required value={annContent} onChange={(e) => setAnnContent(e.target.value)} placeholder="Message content…" className="field" />
+              <p className="mt-1.5 text-sm text-muted">Sent to all members.</p>
+            </div>
+            <button type="submit" className="btn btn-primary w-full">Broadcast announcement</button>
+          </form>
+        </Modal>
       )}
 
       {/* EVENT MODAL */}
       {showEventModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-md w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Create Official Platform Event</h3>
-              <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Create official event" icon={Calendar} onClose={() => setShowEventModal(false)}>
+          <form onSubmit={handleCreateEvent} className="space-y-4">
+            <div>
+              <label htmlFor="ev-title" className="field-label">Event title</label>
+              <input id="ev-title" type="text" required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} className="field" />
             </div>
-            <form onSubmit={handleCreateEvent} className="space-y-3 text-xs">
+            <div>
+              <label htmlFor="ev-description" className="field-label">Description</label>
+              <textarea id="ev-description" rows={3} required value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} className="field" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Event Title</label>
-                <input type="text" required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
+                <label htmlFor="ev-location" className="field-label">Location</label>
+                <input id="ev-location" type="text" required value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })} className="field" />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Description</label>
-                <textarea rows={2} required value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
+                <label htmlFor="ev-date" className="field-label">Date</label>
+                <input id="ev-date" type="date" required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} className="field" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Location</label>
-                  <input type="text" required value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Date</label>
-                  <input type="date" required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-                </div>
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Publish Official Event
-              </button>
-            </form>
-          </div>
-        </div>
+            </div>
+            <button type="submit" className="btn btn-primary w-full">Publish official event</button>
+          </form>
+        </Modal>
       )}
 
       {/* STAFF MODAL */}
       {showStaffModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-md w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Add New Staff / Admin Account</h3>
-              <button onClick={() => setShowStaffModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Add staff account" icon={UserPlus} size="max-w-xl" onClose={() => setShowStaffModal(false)}>
+          <form onSubmit={handleCreateStaff} className="space-y-4">
+            <div>
+              <label htmlFor="staff-name" className="field-label">Full name</label>
+              <input id="staff-name" type="text" required value={staffForm.name} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} className="field" />
             </div>
-            <form onSubmit={handleCreateStaff} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Full Name</label>
-                <input type="text" required value={staffForm.name} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Email Address</label>
-                <input type="email" required value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Password</label>
-                <input type="password" required value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Role</label>
-                <select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })} className="w-full border rounded-lg p-2 outline-none">
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="MODERATOR">MODERATOR</option>
-                </select>
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Create Admin Account
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="staff-email" className="field-label">Email address</label>
+              <input id="staff-email" type="email" required value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} className="field" />
+            </div>
+            <div>
+              <label htmlFor="staff-password" className="field-label">Password</label>
+              <input id="staff-password" type="password" required autoComplete="new-password" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} className="field" />
+            </div>
+            <div>
+              <label htmlFor="staff-role" className="field-label">Role</label>
+              <select
+                id="staff-role"
+                value={staffForm.role}
+                onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value, permissions: presetFor(e.target.value) })}
+                className="field"
+              >
+                <option value="MODERATOR">Moderator — reviews content and reports</option>
+                <option value="ADMIN">Admin — also manages members, events and causes</option>
+              </select>
+              <p className="mt-1.5 text-sm text-muted">Changing the role resets the ticks below to that role's defaults. Adjust them as needed.</p>
+            </div>
+            <AccessChecklist
+              catalog={accessCatalog}
+              value={staffForm.permissions || []}
+              onChange={(permissions) => setStaffForm({ ...staffForm, permissions })}
+              idPrefix="new-staff"
+            />
+            <button type="submit" className="btn btn-primary w-full">Create staff account</button>
+          </form>
+        </Modal>
+      )}
+
+      {/* STAFF ACCESS EDITOR */}
+      {editingAccess && (
+        <Modal
+          title={editingAccess.promoting ? `Make ${editingAccess.name} staff` : `Access for ${editingAccess.name}`}
+          icon={ShieldCheck}
+          size="max-w-xl"
+          onClose={() => setEditingAccess(null)}
+        >
+          <form onSubmit={handleSaveAccess} className="space-y-4">
+            <div>
+              <label htmlFor="access-role" className="field-label">Role</label>
+              <select
+                id="access-role"
+                value={editingAccess.role}
+                onChange={(e) => setEditingAccess({ ...editingAccess, role: e.target.value, permissions: presetFor(e.target.value) })}
+                className="field"
+              >
+                <option value="MODERATOR">Moderator — reviews content and reports</option>
+                <option value="ADMIN">Admin — also manages members, events and causes</option>
+              </select>
+            </div>
+            <AccessChecklist
+              catalog={accessCatalog}
+              value={editingAccess.permissions}
+              onChange={(permissions) => setEditingAccess({ ...editingAccess, permissions })}
+              idPrefix="edit-access"
+            />
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setEditingAccess(null)} className="btn btn-ghost">Cancel</button>
+              <button type="submit" className="btn btn-primary">{editingAccess.promoting ? 'Give staff access' : 'Save access'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* CATEGORY MODAL */}
       {showCategoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-sm w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Add Activity Category</h3>
-              <button onClick={() => setShowCategoryModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Add activity category" icon={FolderKanban} size="max-w-sm" onClose={() => setShowCategoryModal(false)}>
+          <form onSubmit={handleCreateCategory} className="space-y-4">
+            <div>
+              <label htmlFor="cat-name" className="field-label">Category name</label>
+              <input id="cat-name" type="text" required value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} placeholder="e.g. Disaster Relief" className="field" />
             </div>
-            <form onSubmit={handleCreateCategory} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Category Name</label>
-                <input type="text" required value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} placeholder="e.g. Disaster Relief" className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Description</label>
-                <input type="text" value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} placeholder="Brief description..." className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Add Category
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="cat-description" className="field-label">Description</label>
+              <input id="cat-description" type="text" value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} placeholder="Brief description…" className="field" />
+            </div>
+            <button type="submit" className="btn btn-primary w-full">Add category</button>
+          </form>
+        </Modal>
       )}
 
       {/* CAMPAIGN MODAL */}
       {showCampaignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-sm w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Launch Fundraising Campaign</h3>
-              <button onClick={() => setShowCampaignModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Launch fundraising campaign" icon={Megaphone} onClose={() => setShowCampaignModal(false)}>
+          <form onSubmit={handleCreateCampaign} className="space-y-4">
+            <div>
+              <label htmlFor="camp-title" className="field-label">Campaign title</label>
+              <input id="camp-title" type="text" required value={campaignForm.title} onChange={(e) => setCampaignForm({ ...campaignForm, title: e.target.value })} className="field" />
             </div>
-            <form onSubmit={handleCreateCampaign} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Campaign Title</label>
-                <input type="text" required value={campaignForm.title} onChange={(e) => setCampaignForm({ ...campaignForm, title: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Description</label>
-                <textarea rows={2} required value={campaignForm.description} onChange={(e) => setCampaignForm({ ...campaignForm, description: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Target Goal Amount (NPR)</label>
-                <input type="number" required value={campaignForm.goalAmount} onChange={(e) => setCampaignForm({ ...campaignForm, goalAmount: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Launch Campaign Live
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="camp-description" className="field-label">Description</label>
+              <textarea id="camp-description" rows={3} required value={campaignForm.description} onChange={(e) => setCampaignForm({ ...campaignForm, description: e.target.value })} className="field" />
+            </div>
+            <div>
+              <label htmlFor="camp-goal" className="field-label">Target goal amount (NPR)</label>
+              <input id="camp-goal" type="number" required value={campaignForm.goalAmount} onChange={(e) => setCampaignForm({ ...campaignForm, goalAmount: e.target.value })} className="field" />
+            </div>
+            <button type="submit" className="btn btn-primary w-full">Launch campaign</button>
+          </form>
+        </Modal>
       )}
 
       {/* EXPENSE MODAL */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-sm w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs">Log Expense Record</h3>
-              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <Modal title="Log expense record" icon={Receipt} onClose={() => setShowExpenseModal(false)}>
+          <form onSubmit={handleAddExpense} className="space-y-4">
+            <div>
+              <label htmlFor="exp-campaign" className="field-label">Campaign</label>
+              <select id="exp-campaign" required value={expenseForm.campaignId} onChange={(e) => setExpenseForm({ ...expenseForm, campaignId: e.target.value })} className="field">
+                <option value="">Select target campaign…</option>
+                {campaignsList.map((c) => (
+                  <option key={c._id} value={c._id}>{c.title}</option>
+                ))}
+              </select>
             </div>
-            <form onSubmit={handleAddExpense} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Select Campaign</label>
-                <select required value={expenseForm.campaignId} onChange={(e) => setExpenseForm({ ...expenseForm, campaignId: e.target.value })} className="w-full border rounded-lg p-2 outline-none">
-                  <option value="">Select Target Campaign...</option>
-                  {campaignsList.map((c) => (
-                    <option key={c._id} value={c._id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Expense Title / Item</label>
-                <input type="text" required value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} placeholder="e.g. 500 Saplings Purchase" className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Amount Spent (NPR)</label>
-                <input type="number" required value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="w-full border rounded-lg p-2 outline-none" />
-              </div>
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Log Expense
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="exp-title" className="field-label">Expense title / item</label>
+              <input id="exp-title" type="text" required value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} placeholder="e.g. 500 Saplings Purchase" className="field" />
+            </div>
+            <div>
+              <label htmlFor="exp-amount" className="field-label">Amount spent (NPR)</label>
+              <input id="exp-amount" type="number" required value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="field" />
+            </div>
+            <button type="submit" className="btn btn-primary w-full">Log expense</button>
+          </form>
+        </Modal>
       )}
 
       {/* REJECTION MODAL */}
       {rejectingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-sm w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <h3 className="font-bold text-slate-900 text-xs">Specify Rejection Feedback Reason</h3>
-            <textarea rows={3} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explain why this content was rejected so the user can fix it..." className="w-full border rounded-lg p-2 text-xs outline-none" />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setRejectingItem(null)} className="px-3 py-1.5 rounded-lg bg-slate-200 text-xs font-bold">Cancel</button>
-              <button onClick={() => rejectingItem.type === 'POST' ? handleRejectPost(rejectingItem.id, rejectionReason) : handleRejectBlog(rejectingItem.id, rejectionReason)} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold">
-                Confirm Rejection
-              </button>
-            </div>
+        <Modal title="Reason for rejection" size="max-w-sm" onClose={() => setRejectingItem(null)}>
+          <label htmlFor="reject-reason" className="field-label">Feedback for the author</label>
+          <textarea id="reject-reason" rows={4} value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explain why this content was rejected so the user can fix it…" className="field" />
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setRejectingItem(null)} className="btn btn-ghost">Cancel</button>
+            <button type="button" onClick={() => rejectingItem.type === 'POST' ? handleRejectPost(rejectingItem.id, rejectionReason) : handleRejectBlog(rejectingItem.id, rejectionReason)} className="btn btn-primary">
+              Confirm rejection
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* SUSPENSION MODAL */}
       {suspendingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-sm w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <h3 className="font-bold text-slate-900 text-xs">
-              {suspendingUser.isSuspended ? `Reactivate Account for ${suspendingUser.name}?` : `Suspend Account for ${suspendingUser.name}?`}
-            </h3>
-            {!suspendingUser.isSuspended && (
-              <textarea rows={3} value={suspensionReasonInput} onChange={(e) => setSuspensionReasonInput(e.target.value)} placeholder="Reason for account suspension..." className="w-full border rounded-lg p-2 text-xs outline-none" />
-            )}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setSuspendingUser(null)} className="px-3 py-1.5 rounded-lg bg-slate-200 text-xs font-bold">Cancel</button>
-              <button onClick={() => handleSuspendUser(suspendingUser._id, !suspendingUser.isSuspended, suspensionReasonInput)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold">
-                {suspendingUser.isSuspended ? 'Confirm Reactivation' : 'Confirm Suspension'}
-              </button>
-            </div>
+        <Modal
+          title={suspendingUser.isSuspended ? `Reactivate ${suspendingUser.name}?` : `Suspend ${suspendingUser.name}?`}
+          size="max-w-sm"
+          onClose={() => setSuspendingUser(null)}
+        >
+          {!suspendingUser.isSuspended && (
+            <>
+              <label htmlFor="suspend-reason" className="field-label">Reason for suspension</label>
+              <textarea id="suspend-reason" rows={3} value={suspensionReasonInput} onChange={(e) => setSuspensionReasonInput(e.target.value)} placeholder="Reason for account suspension…" className="field" />
+            </>
+          )}
+          {suspendingUser.isSuspended && (
+            <p className="text-sm text-muted">This member will regain access to their account.</p>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <button type="button" onClick={() => setSuspendingUser(null)} className="btn btn-ghost">Cancel</button>
+            <button
+              type="button"
+              onClick={() => handleSuspendUser(suspendingUser._id, !suspendingUser.isSuspended, suspensionReasonInput)}
+              className={suspendingUser.isSuspended ? 'btn btn-pine' : 'btn btn-primary'}
+            >
+              {suspendingUser.isSuspended ? 'Confirm reactivation' : 'Confirm suspension'}
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ORGANIZATION MODAL */}
       {showOrgModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white max-w-md w-full rounded-2xl p-5 space-y-4 border border-slate-200 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-[#94201B]" /> Add New NGO / Partner Organization
-              </h3>
-              <button onClick={() => setShowOrgModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+        <Modal title="Add NGO / partner organization" icon={Building2} size="max-w-lg" onClose={() => setShowOrgModal(false)}>
+          <form onSubmit={handleCreateOrg} className="space-y-4">
+            <div>
+              <label htmlFor="org-name" className="field-label">Organization name *</label>
+              <input
+                id="org-name"
+                type="text"
+                required
+                value={orgForm.name}
+                onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
+                placeholder="Registered organization name"
+                className="field"
+              />
             </div>
-            <form onSubmit={handleCreateOrg} className="space-y-3 text-xs">
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Organization Name *</label>
+                <label htmlFor="org-email" className="field-label">Contact email *</label>
                 <input
-                  type="text"
+                  id="org-email"
+                  type="email"
                   required
-                  value={orgForm.name}
-                  onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
-                  placeholder="e.g. Nepal Red Cross Society"
-                  className="w-full border rounded-lg p-2 text-xs outline-none"
+                  value={orgForm.email}
+                  onChange={(e) => setOrgForm({ ...orgForm, email: e.target.value })}
+                  placeholder="contact@org.org.np"
+                  className="field"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Contact Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={orgForm.email}
-                    onChange={(e) => setOrgForm({ ...orgForm, email: e.target.value })}
-                    placeholder="contact@org.org.np"
-                    className="w-full border rounded-lg p-2 text-xs outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={orgForm.phone}
-                    onChange={(e) => setOrgForm({ ...orgForm, phone: e.target.value })}
-                    placeholder="+977 9800000000"
-                    className="w-full border rounded-lg p-2 text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Reg / License No</label>
-                  <input
-                    type="text"
-                    value={orgForm.regNumber}
-                    onChange={(e) => setOrgForm({ ...orgForm, regNumber: e.target.value })}
-                    placeholder="SWC-12345"
-                    className="w-full border rounded-lg p-2 text-xs outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Org Type</label>
-                  <select
-                    value={orgForm.orgType}
-                    onChange={(e) => setOrgForm({ ...orgForm, orgType: e.target.value })}
-                    className="w-full border rounded-lg p-2 text-xs outline-none"
-                  >
-                    <option value="NGO">NGO / Non-Profit</option>
-                    <option value="INGO">INGO</option>
-                    <option value="Civil Society">Civil Society Group</option>
-                    <option value="Youth Club">Youth Volunteer Club</option>
-                    <option value="Environmental">Environmental Group</option>
-                    <option value="Disaster Response">Disaster Response</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Location</label>
+                <label htmlFor="org-phone" className="field-label">Contact phone</label>
                 <input
+                  id="org-phone"
                   type="text"
-                  value={orgForm.location}
-                  onChange={(e) => setOrgForm({ ...orgForm, location: e.target.value })}
-                  placeholder="e.g. Kathmandu, Nepal"
-                  className="w-full border rounded-lg p-2 text-xs outline-none"
+                  value={orgForm.phone}
+                  onChange={(e) => setOrgForm({ ...orgForm, phone: e.target.value })}
+                  placeholder="Your official wallet or mobile number"
+                  className="field"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Mission / Description</label>
-                <textarea
-                  rows={2}
-                  value={orgForm.description}
-                  onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })}
-                  placeholder="Brief mission statement..."
-                  className="w-full border rounded-lg p-2 text-xs outline-none"
+                <label htmlFor="org-reg" className="field-label">Reg / license no.</label>
+                <input
+                  id="org-reg"
+                  type="text"
+                  value={orgForm.regNumber}
+                  onChange={(e) => setOrgForm({ ...orgForm, regNumber: e.target.value })}
+                  placeholder="SWC-12345"
+                  className="field"
                 />
               </div>
+              <div>
+                <label htmlFor="org-type" className="field-label">Org type</label>
+                <select
+                  id="org-type"
+                  value={orgForm.orgType}
+                  onChange={(e) => setOrgForm({ ...orgForm, orgType: e.target.value })}
+                  className="field"
+                >
+                  <option value="NGO">NGO / Non-Profit</option>
+                  <option value="INGO">INGO</option>
+                  <option value="Civil Society">Civil Society Group</option>
+                  <option value="Youth Club">Youth Volunteer Club</option>
+                  <option value="Environmental">Environmental Group</option>
+                  <option value="Disaster Response">Disaster Response</option>
+                </select>
+              </div>
+            </div>
 
-              <button type="submit" className="w-full py-2.5 rounded-lg font-bold bg-[#94201B] text-white text-xs shadow-md">
-                Register & Verify Organization
-              </button>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label htmlFor="org-location" className="field-label">Location</label>
+              <input
+                id="org-location"
+                type="text"
+                value={orgForm.location}
+                onChange={(e) => setOrgForm({ ...orgForm, location: e.target.value })}
+                placeholder="e.g. Kathmandu, Nepal"
+                className="field"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="org-description" className="field-label">Mission / description</label>
+              <textarea
+                id="org-description"
+                rows={3}
+                value={orgForm.description}
+                onChange={(e) => setOrgForm({ ...orgForm, description: e.target.value })}
+                placeholder="Brief mission statement…"
+                className="field"
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary w-full">
+              <Building2 className="h-4 w-4" aria-hidden="true" /> Register & verify organization
+            </button>
+          </form>
+        </Modal>
       )}
 
     </div>

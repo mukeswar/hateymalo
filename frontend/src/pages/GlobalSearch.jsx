@@ -2,20 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import API from '../services/api';
 import PostCard from '../components/PostCard';
-import VerificationBadge from '../components/VerificationBadge';
+import Avatar from '../components/ui/Avatar';
 import {
   Search,
-  Calendar,
+  CalendarDays,
   BookOpen,
   Users,
   Building2,
-  Filter,
+  HandHelping,
   ArrowRight,
   MapPin,
-  Clock,
-  Heart,
-  Eye,
+  BadgeCheck,
+  SearchX,
+  LayoutGrid,
 } from 'lucide-react';
+
+const SectionTitle = ({ icon: Icon, title, count, tone }) => (
+  <div className="flex items-center gap-3 mb-5">
+    <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${tone}`}>
+      <Icon className="w-5 h-5" aria-hidden="true" />
+    </span>
+    <h2 className="text-2xl font-semibold text-ink">{title}</h2>
+    <span className="chip bg-paper-deep text-ink-soft">{count}</span>
+  </div>
+);
 
 const GlobalSearch = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -66,161 +76,206 @@ const GlobalSearch = () => {
     performSearch();
   };
 
+  const tabs = [
+    { key: 'ALL', label: 'All', icon: LayoutGrid, count: totalCount },
+    { key: 'POSTS', label: 'Help requests', icon: HandHelping, count: results.posts.length },
+    { key: 'EVENTS', label: 'Events', icon: CalendarDays, count: results.events.length },
+    { key: 'BLOGS', label: 'Stories', icon: BookOpen, count: results.blogs.length },
+    { key: 'MEMBERS', label: 'Members', icon: Users, count: results.members.length },
+    { key: 'ORGANIZATIONS', label: 'Organisations', icon: Building2, count: results.organizations.length },
+  ];
+
+  const show = (key, list) => (entityType === 'ALL' || entityType === key) && list.length > 0;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* Header & Search Bar */}
-      <div className="space-y-4 max-w-4xl mx-auto text-center">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Universal Search Engine</h1>
-        <p className="text-sm text-slate-600">Search across posts, official assemblies, blog stories, members, and NGOs across Nepal.</p>
+    <div className="pb-20">
+      {/* Header & search */}
+      <header className="relative overflow-hidden border-b border-sand bg-paper-deep/60">
+        <div className="absolute inset-0 grain opacity-60" aria-hidden="true" />
+        <div className="container-page relative pt-10 sm:pt-14 pb-8">
+          <div className="max-w-3xl mx-auto text-center space-y-3 animate-rise">
+            <span className="eyebrow deva justify-center">खोज्नुहोस्</span>
+            <h1 className="text-4xl sm:text-5xl font-bold text-ink leading-[1.08]">Find people, help and stories</h1>
+            <p className="text-muted text-lg">Search help requests, events, stories, members and organisations across Nepal.</p>
+          </div>
 
-        <form onSubmit={handleFormSubmit} className="bg-white p-3 rounded-3xl border border-slate-200 shadow-lg flex items-center gap-2">
-          <Search className="w-5 h-5 text-slate-400 ml-3" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search keywords, locations, skills, NGOs, events..."
-            className="w-full bg-transparent text-slate-900 text-sm outline-none px-2 placeholder-slate-400"
-          />
-          <button type="submit" className="px-6 py-3 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md">
-            Search
-          </button>
-        </form>
-      </div>
-
-      {/* Entity Filters Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-        {[
-          { key: 'ALL', label: `All Results (${totalCount})` },
-          { key: 'POSTS', label: `Help & Posts (${results.posts.length})` },
-          { key: 'EVENTS', label: `Official Events (${results.events.length})` },
-          { key: 'BLOGS', label: `Blog Stories (${results.blogs.length})` },
-          { key: 'MEMBERS', label: `Members (${results.members.length})` },
-          { key: 'ORGANIZATIONS', label: `Organizations (${results.organizations.length})` },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setEntityType(tab.key)}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
-              entityType === tab.key
-                ? 'bg-teal-600 text-white shadow-md'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-            }`}
+          <form
+            role="search"
+            onSubmit={handleFormSubmit}
+            className="mt-8 max-w-3xl mx-auto card !rounded-full p-1.5 sm:p-2 flex items-center gap-2 focus-within:ring-4 focus-within:ring-brand/10 focus-within:border-brand transition-shadow"
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            <Search className="w-5 h-5 text-muted ml-3 sm:ml-4 shrink-0" aria-hidden="true" />
+            <label htmlFor="global-search-input" className="sr-only">Search Hateymalo</label>
+            <input
+              id="global-search-input"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Keywords, places, skills, organisations…"
+              className="w-full min-w-0 bg-transparent text-ink text-base sm:text-lg outline-none py-2.5 placeholder:text-[#9A8F84]"
+            />
+            <button type="submit" className="btn btn-primary shrink-0">
+              Search
+            </button>
+          </form>
+        </div>
 
-      {/* SEARCH RESULTS */}
-      {loading ? (
-        <div className="h-64 rounded-3xl animate-pulse bg-slate-200" />
-      ) : totalCount > 0 ? (
-        <div className="space-y-10">
+        {/* Tabs */}
+        <div className="container-page relative">
+          <div className="flex gap-1 overflow-x-auto -mb-px max-w-full" role="tablist" aria-label="Filter results by type">
+            {tabs.map(({ key, label, icon: Icon, count }) => {
+              const active = entityType === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setEntityType(key)}
+                  className={`inline-flex items-center gap-2 px-4 min-h-12 border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${
+                    active ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" />
+                  {label}
+                  <span className={`text-xs tabular-nums rounded-full px-1.5 ${active ? 'bg-brand-tint text-brand' : 'bg-white/70 text-muted'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </header>
 
-          {/* 1. Posts */}
-          {(entityType === 'ALL' || entityType === 'POSTS') && results.posts.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-teal-700">Community Help & Posts</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {results.posts.map((post) => (
-                  <PostCard key={post._id} post={post} />
-                ))}
+      {/* Results */}
+      <section className="container-page pt-10" aria-live="polite" aria-busy={loading}>
+        {loading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-64 bg-paper-deep animate-pulse rounded-[var(--radius-card)]" />
+            ))}
+          </div>
+        ) : totalCount > 0 ? (
+          <div className="space-y-14">
+            {/* Posts */}
+            {show('POSTS', results.posts) && (
+              <div>
+                <SectionTitle icon={HandHelping} title="Help requests" count={results.posts.length} tone="bg-brand-tint text-brand" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {results.posts.map((post) => (
+                    <PostCard key={post._id} post={post} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 2. Official Events */}
-          {(entityType === 'ALL' || entityType === 'EVENTS') && results.events.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-sky-700">Official Assemblies & Events</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {results.events.map((ev) => (
-                  <div key={ev._id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-md space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-teal-800 border border-teal-200">{ev.category}</span>
-                      <h4 className="font-bold text-slate-900 text-base line-clamp-1">{ev.title}</h4>
-                      <p className="text-xs text-slate-600 line-clamp-2">{ev.description}</p>
-                    </div>
-                    <Link to={`/events/${ev._id}`} className="py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-teal-600 hover:text-white text-slate-800 text-center border border-slate-200 block">
-                      View Event
+            {/* Events */}
+            {show('EVENTS', results.events) && (
+              <div>
+                <SectionTitle icon={CalendarDays} title="Events" count={results.events.length} tone="bg-sky-tint text-sky-ink" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {results.events.map((ev) => (
+                    <Link key={ev._id} to={`/events/${ev._id}`} className="card card-hover p-6 flex flex-col group">
+                      {ev.category && <span className="chip bg-sky-tint text-sky-ink self-start mb-3">{ev.category}</span>}
+                      <h3 className="text-lg font-semibold text-ink leading-snug line-clamp-2 group-hover:text-brand transition-colors">{ev.title}</h3>
+                      {ev.description && <p className="text-sm text-muted line-clamp-2 mt-2">{ev.description}</p>}
+                      <span className="mt-auto pt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink">
+                        View event <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                      </span>
                     </Link>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 3. Blogs */}
-          {(entityType === 'ALL' || entityType === 'BLOGS') && results.blogs.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-amber-700">Community Blog Stories</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {results.blogs.map((b) => (
-                  <Link key={b._id} to={`/blogs/${b._id}`} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-md space-y-3 flex flex-col justify-between hover:border-amber-300">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-base line-clamp-2">{b.title}</h4>
-                      <p className="text-xs text-slate-600 mt-1">By {b.author?.name}</p>
-                    </div>
-                  </Link>
-                ))}
+            {/* Blogs */}
+            {show('BLOGS', results.blogs) && (
+              <div>
+                <SectionTitle icon={BookOpen} title="Stories" count={results.blogs.length} tone="bg-marigold-tint text-marigold-text" />
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {results.blogs.map((b) => (
+                    <Link key={b._id} to={`/blogs/${b._id}`} className="card card-hover p-6 flex flex-col group">
+                      <h3 className="text-lg font-semibold text-ink leading-snug line-clamp-2 group-hover:text-brand transition-colors">{b.title}</h3>
+                      {b.author?.name && (
+                        <div className="mt-auto pt-4 flex items-center gap-2 text-sm text-muted">
+                          <Avatar name={b.author.name} src={b.author.profilePicture} size="xs" />
+                          <span className="truncate">By {b.author.name}</span>
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 4. Members */}
-          {(entityType === 'ALL' || entityType === 'MEMBERS') && results.members.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-purple-700">Community Members</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {results.members.map((m) => (
-                  <div key={m._id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex items-center gap-3">
-                    <img src={m.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'} alt={m.name} className="w-10 h-10 rounded-xl object-cover" />
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1">
-                        {m.name} <VerificationBadge level={m.memberLevel} isVerified={m.isVerified} showLabel={false} />
-                      </h4>
-                      <p className="text-[10px] text-slate-600">{m.location}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 5. Organizations */}
-          {(entityType === 'ALL' || entityType === 'ORGANIZATIONS') && results.organizations.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-700">Verified Organizations & NGOs</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {results.organizations.map((org) => (
-                  <div key={org._id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-md space-y-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold border border-emerald-200">
-                        <Building2 className="w-5 h-5" />
+            {/* Members */}
+            {show('MEMBERS', results.members) && (
+              <div>
+                <SectionTitle icon={Users} title="Members" count={results.members.length} tone="bg-pine-tint text-pine" />
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {results.members.map((m) => (
+                    <Link key={m._id} to={`/profile/${m._id}`} className="card card-hover p-4 flex items-center gap-3 group">
+                      <Avatar name={m.name} src={m.profilePicture} size="md" />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-ink flex items-center gap-1.5 group-hover:text-brand transition-colors">
+                          <span className="truncate">{m.name}</span>
+                          {m.isVerified && <BadgeCheck className="w-4 h-4 text-pine shrink-0" aria-label="Verified" />}
+                        </h3>
+                        {m.location && (
+                          <p className="text-sm text-muted flex items-center gap-1 truncate">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {m.location}
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                          {org.orgDetails?.orgName || org.name} <VerificationBadge level="ORGANIZATION" isVerified={true} />
-                        </h4>
-                        <p className="text-xs text-emerald-700">{org.orgDetails?.orgType || 'Community Organization'}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-600">{org.orgDetails?.description || org.bio}</p>
-                  </div>
-                ))}
+                    </Link>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Organisations */}
+            {show('ORGANIZATIONS', results.organizations) && (
+              <div>
+                <SectionTitle icon={Building2} title="Organisations" count={results.organizations.length} tone="bg-sky-tint text-sky-ink" />
+                <div className="grid md:grid-cols-2 gap-5">
+                  {results.organizations.map((org) => {
+                    const name = org.orgDetails?.orgName || org.name;
+                    const description = org.orgDetails?.description || org.bio;
+                    return (
+                      <Link key={org._id} to={`/profile/${org._id}`} className="card card-hover p-5 flex gap-4 group">
+                        <Avatar name={name} src={org.profilePicture} size="lg" rounded="rounded-2xl" />
+                        <div className="min-w-0 space-y-1.5">
+                          <h3 className="text-lg font-semibold text-ink leading-snug group-hover:text-brand transition-colors">{name}</h3>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="chip bg-sky-tint text-sky-ink">{org.orgDetails?.orgType || 'Organisation'}</span>
+                            {org.isVerified && (
+                              <span className="chip bg-pine-tint text-pine">
+                                <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> Verified
+                              </span>
+                            )}
+                          </div>
+                          {description && <p className="text-sm text-muted line-clamp-2">{description}</p>}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="card p-10 sm:p-14 text-center max-w-xl mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-paper-deep text-ink-soft flex items-center justify-center mx-auto">
+              <SearchX className="w-7 h-7" aria-hidden="true" />
             </div>
-          )}
-
-        </div>
-      ) : (
-        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-2">
-          <p className="text-slate-600 text-sm">No results found matching your search query.</p>
-        </div>
-      )}
-
+            <h2 className="text-2xl font-semibold text-ink">Nothing found{query ? ` for “${query}”` : ''}</h2>
+            <p className="text-muted">Try a shorter word, a nearby place, or a different category.</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link to="/explore" className="btn btn-primary">Browse help requests</Link>
+              <Link to="/members" className="btn btn-ghost">See members</Link>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

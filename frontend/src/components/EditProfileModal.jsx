@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, Camera, Sparkles, MapPin, AlignLeft, Award, Heart, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, UserPen, Camera, MapPin, Award, Heart, Upload, Link2, RotateCcw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import Avatar from './ui/Avatar';
 
 const EditProfileModal = ({ isOpen, onClose }) => {
   const { user, updateProfile } = useAuth();
@@ -25,6 +26,21 @@ const EditProfileModal = ({ isOpen, onClose }) => {
       setInterests(user.interests ? user.interests.join(', ') : '');
     }
   }, [user, isOpen]);
+
+  // Close on Escape and lock background scroll while open
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !loading) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, loading, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -65,184 +81,183 @@ const EditProfileModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const isDataUrl = profilePicture.startsWith('data:');
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
-        
+    <div
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-ink/50 backdrop-blur-sm animate-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !loading) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-profile-title"
+        className="card !rounded-t-3xl !rounded-b-none sm:!rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-y-auto animate-pop"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-start justify-between gap-4 px-6 sm:px-8 pt-6 pb-4 border-b border-sand">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-[#C8382C] flex items-center justify-center border border-rose-200 shadow-xs">
-              <UserCheck className="w-5 h-5" />
-            </div>
+            <span className="w-11 h-11 rounded-full bg-brand-tint text-brand flex items-center justify-center shrink-0">
+              <UserPen className="w-5 h-5" aria-hidden="true" />
+            </span>
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Edit Public Profile</h3>
-              <p className="text-xs text-slate-500">Upload profile picture and update bio, skills, and interests</p>
+              <h2 id="edit-profile-title" className="text-xl font-bold text-ink leading-tight">Edit your profile</h2>
+              <p className="text-sm text-muted">This is what other members see on your public profile.</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-paper-deep transition-colors shrink-0"
+            aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-          
-          {/* Avatar Upload & Live Preview Section */}
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Profile Photo Selection
-            </label>
-
+        <form onSubmit={handleSubmit} className="px-6 sm:px-8 py-6 space-y-6">
+          {/* Photo */}
+          <fieldset className="surface-sunken p-5">
+            <legend className="sr-only">Profile photo</legend>
             <div className="flex flex-col sm:flex-row items-center gap-5">
               <div className="relative group shrink-0">
-                <img
-                  src={profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                  alt={name}
-                  className="w-24 h-24 rounded-2xl object-cover border-2 border-[#C8382C] shadow-md"
-                />
+                <Avatar name={name || user.name} src={profilePicture} size="xl" className="ring-4 ring-white shadow-[var(--shadow-soft)]" />
                 <label
                   htmlFor="profile-file-input"
-                  className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center cursor-pointer text-white"
-                  title="Change Photo"
+                  className="absolute inset-0 rounded-full bg-ink/45 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white"
+                  title="Change photo"
                 >
-                  <Camera className="w-7 h-7" />
+                  <Camera className="w-7 h-7" aria-hidden="true" />
+                  <span className="sr-only">Change photo</span>
                 </label>
               </div>
 
-              <div className="space-y-2 flex-1 w-full text-center sm:text-left">
+              <div className="space-y-3 flex-1 w-full text-center sm:text-left">
+                <p className="field-label !mb-0">Profile photo</p>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <label
-                    htmlFor="profile-file-input"
-                    className="px-4 py-2.5 rounded-xl font-bold bg-[#C8382C] hover:bg-[#b02e23] text-white text-xs shadow-sm cursor-pointer inline-flex items-center gap-2 transition-all hover:scale-102"
-                  >
-                    <Upload className="w-4 h-4" /> Upload Image from Computer / Phone
+                  <label htmlFor="profile-file-input" className="btn btn-primary btn-sm cursor-pointer">
+                    <Upload className="w-4 h-4" aria-hidden="true" /> Upload a photo
                   </label>
                   <input
                     id="profile-file-input"
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="hidden"
+                    className="sr-only"
                   />
-
                   {profilePicture && (
-                    <button
-                      type="button"
-                      onClick={() => setProfilePicture('')}
-                      className="px-3 py-2.5 rounded-xl font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs transition-colors"
-                    >
-                      Reset Photo
+                    <button type="button" onClick={() => setProfilePicture('')} className="btn btn-ghost btn-sm">
+                      <RotateCcw className="w-4 h-4" aria-hidden="true" /> Remove photo
                     </button>
                   )}
                 </div>
+                <p className="text-sm text-muted">PNG, JPG or WebP, up to 5 MB. Or paste a link to an image below.</p>
 
-                <p className="text-[11px] text-slate-500">
-                  Select any PNG, JPG, or WebP photo from your device. You can also paste an image URL below.
-                </p>
-
-                <div className="pt-2 border-t border-slate-200/80">
+                <div className="relative">
+                  <Link2 className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <label htmlFor="profile-photo-url" className="sr-only">Image URL</label>
                   <input
+                    id="profile-photo-url"
                     type="url"
-                    value={profilePicture}
+                    value={isDataUrl ? '' : profilePicture}
                     onChange={(e) => setProfilePicture(e.target.value)}
-                    placeholder="Or paste image URL (https://...)"
-                    className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none font-mono"
+                    placeholder={isDataUrl ? 'Uploaded photo selected' : 'https://…'}
+                    className="field pl-10"
+                    autoComplete="photo"
                   />
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Full Name <span className="text-[#C8382C]">*</span>
+              <label htmlFor="ep-name" className="field-label">
+                Full name <span className="text-brand" aria-hidden="true">*</span>
               </label>
               <input
+                id="ep-name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] rounded-xl p-3 text-xs text-slate-900 outline-none font-bold"
+                autoComplete="name"
+                className="field"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-500" /> Location / District
+              <label htmlFor="ep-location" className="field-label flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-muted" aria-hidden="true" /> Location / district
               </label>
               <input
+                id="ep-location"
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. Kathmandu, Nepal"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] rounded-xl p-3 text-xs text-slate-900 outline-none"
+                autoComplete="address-level2"
+                className="field"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <AlignLeft className="w-3.5 h-3.5 text-slate-500" /> Bio / About Me
-            </label>
+            <label htmlFor="ep-bio" className="field-label">About you</label>
             <textarea
+              id="ep-bio"
               rows={3}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell the community about yourself, your passion, and how you'd like to collaborate..."
-              className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] rounded-xl p-3 text-xs text-slate-900 outline-none"
+              placeholder="A few lines about yourself and how you like to help."
+              className="field resize-y"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <Award className="w-3.5 h-3.5 text-teal-600" /> Skills (comma separated)
+            <label htmlFor="ep-skills" className="field-label flex items-center gap-1.5">
+              <Award className="w-4 h-4 text-pine" aria-hidden="true" /> Skills
             </label>
             <input
+              id="ep-skills"
               type="text"
               value={skills}
               onChange={(e) => setSkills(e.target.value)}
-              placeholder="e.g., First Aid, Teaching, Event Organizing, Web Development, Cooking"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] rounded-xl p-3 text-xs text-slate-900 outline-none"
+              placeholder="e.g. First aid, Teaching, Cooking"
+              aria-describedby="ep-skills-hint"
+              className="field"
             />
-            <p className="text-[10px] text-slate-400 mt-1">Separate each skill with a comma to render as community badges.</p>
+            <p id="ep-skills-hint" className="text-sm text-muted mt-1.5">Separate each skill with a comma.</p>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5 text-rose-600" /> Community Interests (comma separated)
+            <label htmlFor="ep-interests" className="field-label flex items-center gap-1.5">
+              <Heart className="w-4 h-4 text-brand" aria-hidden="true" /> Causes you care about
             </label>
             <input
+              id="ep-interests"
               type="text"
               value={interests}
               onChange={(e) => setInterests(e.target.value)}
-              placeholder="e.g., Tree Plantation, Blood Donation, Youth Mentoring, Clean Drive"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] rounded-xl p-3 text-xs text-slate-900 outline-none"
+              placeholder="e.g. Tree plantation, Blood donation, Youth mentoring"
+              aria-describedby="ep-interests-hint"
+              className="field"
             />
-            <p className="text-[10px] text-slate-400 mt-1">Helps match you with relevant volunteer help requests near you.</p>
+            <p id="ep-interests-hint" className="text-sm text-muted mt-1.5">
+              Separate with commas. Helps match you with help requests near you.
+            </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 pt-5 border-t border-sand">
+            <button type="button" onClick={onClose} className="btn btn-ghost">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 rounded-xl text-xs font-bold bg-[#C8382C] hover:bg-[#b02e23] text-white shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {loading ? 'Saving Profile...' : 'Save Profile Changes'}
+            <button type="submit" disabled={loading} className="btn btn-primary">
+              {loading ? 'Saving…' : 'Save changes'}
             </button>
           </div>
-
         </form>
       </div>
     </div>

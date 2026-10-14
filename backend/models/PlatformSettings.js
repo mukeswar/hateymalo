@@ -5,7 +5,7 @@ const platformSettingsSchema = new mongoose.Schema(
     // General Settings
     platformName: {
       type: String,
-      default: 'हातेमालो (HAATEMALO)',
+      default: 'हातेमालो (HATEYMALO)',
     },
     tagline: {
       type: String,
@@ -13,13 +13,13 @@ const platformSettingsSchema = new mongoose.Schema(
     },
     contactEmail: {
       type: String,
-      default: 'support@haatemalo.org',
+      default: 'support@hateymalo.com',
     },
     
     // Payment QR Code & Settings
     paymentQrCode: {
       type: String,
-      default: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=HAATEMALO-DONATION-OFFICIAL-QR',
+      default: '', // set by a Super Admin; empty = not configured
     },
     paymentInstructions: {
       type: String,
@@ -27,7 +27,7 @@ const platformSettingsSchema = new mongoose.Schema(
     },
     paymentPhone: {
       type: String,
-      default: '+977 9800000000',
+      default: '', // set by a Super Admin; empty = not configured
     },
 
     // Homepage CMS Settings

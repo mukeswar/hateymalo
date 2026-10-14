@@ -1,0 +1,8 @@
+# The Expo app is built separately (EAS); never upload it to the website deploy
+mobile
+# Secrets live in Vercel environment variables, not in uploaded files
+.env
+**/.env
+backend/node_modules
+frontend/node_modules
+frontend/dist

@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Hateymalo",
+    "slug": "hateymalo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hateymalo.app"
+    },
+    "android": {
+      "package": "com.hateymalo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FBF7F0",
+        "foregroundImage": "./assets/logo.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/logo-mark.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      "expo-image",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo-mark.png",
+          "imageWidth": 160,
+          "backgroundColor": "#FBF7F0"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "scheme": "hateymalo",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "655515ff-fcfa-4f4a-8808-cc1812ed9d2f"
+      }
+    },
+    "owner": "mukeshwar"
+  }
+}

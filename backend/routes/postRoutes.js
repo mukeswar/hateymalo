@@ -10,14 +10,14 @@ const {
   toggleFeaturedPost,
   deletePost,
 } = require('../controllers/postController');
-const { protect } = require('../middleware/auth');
+const { protect, optionalAuth } = require('../middleware/auth');
 
 router.route('/')
-  .get(getPublicPosts)
+  .get(optionalAuth, getPublicPosts)
   .post(protect, createPost);
 
 router.get('/user/my-posts', protect, getUserPosts);
-router.get('/:id', getPostById);
+router.get('/:id', optionalAuth, getPostById);
 router.post('/:id/join', protect, joinPost);
 router.put('/:id/status', protect, updatePostStatus);
 router.put('/:id/feature', protect, toggleFeaturedPost);

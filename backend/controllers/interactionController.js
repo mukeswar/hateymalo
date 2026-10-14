@@ -1,9 +1,12 @@
 const Post = require('../models/Post');
+const Event = require('../models/Event');
+const Blog = require('../models/Blog');
 const Comment = require('../models/Comment');
 const PostUpdate = require('../models/PostUpdate');
 const CommentReport = require('../models/CommentReport');
 const Notification = require('../models/Notification');
 const { isStaff } = require('../utils/roles');
+const { hasPermission } = require('../utils/permissions');
 const { getSettings } = require('../utils/settingsCache');
 
 // @desc    Toggle Interest (❤️) on a post
@@ -100,7 +103,22 @@ const createComment = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Commenting is currently disabled by the administrators.' });
     }
 
-    const post = await Post.findById(req.params.id);
+    // The same comment thread serves posts, events and blog stories (the id is
+    // stored in `post`; ObjectIds are unique across collections). Notifications
+    // link to whichever kind of item was commented on.
+    let post = await Post.findById(req.params.id);
+    let ownerId = post?.creator;
+    let notifyRef = post ? { post: req.params.id } : null;
+    if (!post) {
+      post = await Event.findById(req.params.id);
+      ownerId = post?.creator;
+      notifyRef = post ? { event: req.params.id } : null;
+    }
+    if (!post) {
+      post = await Blog.findById(req.params.id);
+      ownerId = post?.author;
+      notifyRef = post ? { blog: req.params.id } : null;
+    }
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
@@ -128,19 +146,19 @@ const createComment = async (req, res) => {
           type: 'REPLY',
           title: 'New Reply to your comment 💬',
           message: `${req.user.name} replied to your comment on "${post.title}"`,
-          post: post._id,
+          ...notifyRef,
         });
       }
     } else {
       // Top-level comment notification to creator
-      if (post.creator.toString() !== req.user._id.toString()) {
+      if (ownerId && ownerId.toString() !== req.user._id.toString()) {
         await Notification.create({
-          recipient: post.creator,
+          recipient: ownerId,
           sender: req.user._id,
           type: 'COMMENT',
           title: 'New Comment on your post 💬',
           message: `${req.user.name} commented on "${post.title}"`,
-          post: post._id,
+          ...notifyRef,
         });
       }
     }
@@ -219,7 +237,7 @@ const deleteComment = async (req, res) => {
     }
 
     const isAuthor = comment.author.toString() === req.user._id.toString();
-    const isAdmin = isStaff(req.user);
+    const isAdmin = hasPermission(req.user, 'canDeletePosts');
 
     if (!isAuthor && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' });

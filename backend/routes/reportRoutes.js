@@ -5,12 +5,12 @@ const {
   getAllReports,
   resolveReportAction,
 } = require('../controllers/reportController');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 router.route('/')
   .post(protect, createReport)
-  .get(protect, adminOnly, getAllReports);
+  .get(protect, requirePermission('canManageReports'), getAllReports);
 
-router.put('/:id/resolve', protect, adminOnly, resolveReportAction);
+router.put('/:id/resolve', protect, requirePermission('canManageReports'), resolveReportAction);
 
 module.exports = router;

@@ -36,7 +36,7 @@ const seedData = async () => {
     console.log('Seeding official users (Admin, Ram, Sita, Aarav, Kriti, NGO)...');
     const adminUser = await User.create({
       name: 'Super Admin (हातेमालो)',
-      email: 'admin@haatemalo.org',
+      email: 'admin@hateymalo.com',
       password: 'admin123',
       role: 'SUPER_ADMIN',
       permissions: [
@@ -61,7 +61,7 @@ const seedData = async () => {
 
     const userRam = await User.create({
       name: 'Ram Shrestha',
-      email: 'ram@haatemalo.org',
+      email: 'ram@hateymalo.com',
       password: 'user123',
       role: 'USER',
       memberLevel: 'VERIFIED MEMBER',
@@ -75,7 +75,7 @@ const seedData = async () => {
 
     const userSita = await User.create({
       name: 'Sita Gurung',
-      email: 'sita@haatemalo.org',
+      email: 'sita@hateymalo.com',
       password: 'user123',
       role: 'USER',
       memberLevel: 'TRUSTED MEMBER',
@@ -89,7 +89,7 @@ const seedData = async () => {
 
     const userAarav = await User.create({
       name: 'Aarav Sharma',
-      email: 'aarav@haatemalo.org',
+      email: 'aarav@hateymalo.com',
       password: 'user123',
       role: 'USER',
       memberLevel: 'TRUSTED MEMBER',
@@ -103,7 +103,7 @@ const seedData = async () => {
 
     const userKriti = await User.create({
       name: 'Kriti Thapa',
-      email: 'kriti@haatemalo.org',
+      email: 'kriti@hateymalo.com',
       password: 'user123',
       role: 'USER',
       memberLevel: 'NEW MEMBER',
@@ -117,7 +117,7 @@ const seedData = async () => {
 
     const orgSamajSeva = await User.create({
       name: 'Samaj Seva Nepal (NGO)',
-      email: 'ngo@haatemalo.org',
+      email: 'ngo@hateymalo.com',
       password: 'user123',
       role: 'USER',
       memberLevel: 'ORGANIZATION',
@@ -273,7 +273,7 @@ const seedData = async () => {
     console.log('Seeding official community blog stories...');
     await Blog.create({
       title: 'How 50 Volunteers Transformed Shankhamul Bagmati Riverbed in 4 Weeks',
-      content: 'When we first launched the Bagmati cleanliness initiative on HAATEMALO, many doubted whether a small team of youth volunteers could make an impact. Over four intense weekends, 50 dedicated citizens collected over 2.5 metric tons of non-biodegradable waste. Here is our story of community solidarity...',
+      content: 'When we first launched the Bagmati cleanliness initiative on HATEYMALO, many doubted whether a small team of youth volunteers could make an impact. Over four intense weekends, 50 dedicated citizens collected over 2.5 metric tons of non-biodegradable waste. Here is our story of community solidarity...',
       author: userRam._id,
       status: 'APPROVED',
       coverImage: 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?auto=format&fit=crop&w=800&q=80',
@@ -282,7 +282,7 @@ const seedData = async () => {
 
     await Blog.create({
       title: 'Empowering Rural Classrooms: The Story Behind Chitwan Book Drive',
-      content: 'Access to supplementary reading books and learning materials remains a challenge for students in remote Chepang settlements. Thanks to donations mobilized via HAATEMALO, we successfully established two new community school libraries equipped with over 800 storybooks and science guides.',
+      content: 'Access to supplementary reading books and learning materials remains a challenge for students in remote Chepang settlements. Thanks to donations mobilized via HATEYMALO, we successfully established two new community school libraries equipped with over 800 storybooks and science guides.',
       author: userSita._id,
       status: 'APPROVED',
       coverImage: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=800&q=80',
@@ -290,8 +290,8 @@ const seedData = async () => {
     });
 
     await Blog.create({
-      title: '100% Financial Transparency: How HAATEMALO Itemized Ledgers Build Trust',
-      content: 'In non-profit mutual aid, trust is everything. At HAATEMALO, every donation dollar is tracked down to individual line-item expense receipts. Transparency empowers volunteers and donors to see the tangible real-world impact of their generosity.',
+      title: '100% Financial Transparency: How HATEYMALO Itemized Ledgers Build Trust',
+      content: 'In non-profit mutual aid, trust is everything. At HATEYMALO, every donation dollar is tracked down to individual line-item expense receipts. Transparency empowers volunteers and donors to see the tangible real-world impact of their generosity.',
       author: adminUser._id,
       status: 'APPROVED',
       coverImage: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=800&q=80',
@@ -368,9 +368,9 @@ const seedData = async () => {
 
     console.log('Initializing Platform Settings & CMS...');
     await PlatformSettings.create({
-      platformName: 'हातेमालो (HAATEMALO)',
+      platformName: 'हातेमालो (HATEYMALO)',
       tagline: 'मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।',
-      contactEmail: 'support@haatemalo.org',
+      contactEmail: 'support@hateymalo.com',
       heroSmallLabel: 'Together, We Can Make a Difference',
       heroHeadline: 'मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।',
       heroDescription: 'हातेमालो is an official non-profit community platform where citizens, volunteers, and NGOs collaborate for mutual help, education support, environmental drives, and civic initiatives.',
@@ -379,19 +379,24 @@ const seedData = async () => {
 
     console.log('====================================================');
     console.log('  Database Cleaned & Rich Nepali Data Populated!');
-    console.log('  Super Admin: admin@haatemalo.org / admin123');
-    console.log('  User Ram:    ram@haatemalo.org   / user123');
-    console.log('  User Sita:   sita@haatemalo.org  / user123');
+    console.log('  Super Admin: admin@hateymalo.com / admin123');
+    console.log('  User Ram:    ram@hateymalo.com   / user123');
+    console.log('  User Sita:   sita@hateymalo.com  / user123');
     console.log('====================================================');
   } catch (error) {
     console.error('Error seeding authorized data:', error.message);
   }
 };
 
-const autoSeedIfEmpty = async () => {
+// onlyIfNoUsers: used for the real (Atlas) database. seedData() wipes every
+// collection, so a live DB is only seeded when it has no users and no posts.
+const autoSeedIfEmpty = async ({ onlyIfNoUsers = false } = {}) => {
   try {
     const userCount = await User.countDocuments();
-    if (userCount <= 1) {
+    const isEmpty = onlyIfNoUsers
+      ? userCount === 0 && (await Post.countDocuments()) === 0
+      : userCount <= 1;
+    if (isEmpty) {
       console.log('Initializing rich community dataset...');
       await seedData();
     }

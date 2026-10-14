@@ -4,10 +4,10 @@ const {
   createAnnouncement,
   getActiveAnnouncements,
 } = require('../controllers/announcementController');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 router.route('/')
   .get(getActiveAnnouncements)
-  .post(protect, adminOnly, createAnnouncement);
+  .post(protect, requirePermission('canSendNotifications'), createAnnouncement);
 
 module.exports = router;

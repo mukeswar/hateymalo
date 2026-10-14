@@ -1,49 +1,66 @@
 import React from 'react';
-import { CheckCircle2, ShieldCheck, Building2, ShieldAlert, Award } from 'lucide-react';
+import { BadgeCheck, ShieldCheck, Building2, ShieldAlert, Award, Crown, HandHeart } from 'lucide-react';
+
+const PINE = 'bg-pine-tint text-pine border-pine/20';
+const MARIGOLD = 'bg-marigold-tint text-marigold-text border-marigold/40';
+const BRAND = 'bg-brand-tint text-brand border-brand/20';
+
+const humanize = (s = '') =>
+  String(s)
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase());
 
 const VerificationBadge = ({ level = 'MEMBER', isVerified = false, showLabel = true }) => {
   if (!isVerified && (!level || level === 'NEW MEMBER' || level === 'MEMBER')) {
     return null;
   }
 
-  // Base styling for Light Theme
-  let colorClasses = 'bg-sky-50 text-sky-800 border-sky-300';
-  let IconComponent = CheckCircle2;
-  let displayLabel = level;
+  let colorClasses = MARIGOLD;
+  let IconComponent = Award;
+  let displayLabel = humanize(level);
 
   if (isVerified) {
-    colorClasses = 'bg-sky-100 text-sky-900 border-sky-400 shadow-2xs';
-    IconComponent = CheckCircle2;
-    displayLabel = level === 'ORGANIZATION' ? 'VERIFIED NGO ✓' : 'VERIFIED ✓';
+    colorClasses = PINE;
+    IconComponent = BadgeCheck;
+    displayLabel = level === 'ORGANIZATION' ? 'Verified organisation' : 'Verified';
   } else if (level === 'ORGANIZATION') {
-    colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-300';
+    colorClasses = MARIGOLD;
     IconComponent = Building2;
-    displayLabel = 'NGO / ORG';
+    displayLabel = 'Organisation';
   } else if (level === 'VOLUNTEER') {
-    colorClasses = 'bg-teal-50 text-teal-800 border-teal-300';
-    IconComponent = ShieldCheck;
-    displayLabel = 'VOLUNTEER 🤝';
+    colorClasses = MARIGOLD;
+    IconComponent = HandHeart;
+    displayLabel = 'Volunteer';
   } else if (level === 'SENIOR_VOLUNTEER') {
-    colorClasses = 'bg-purple-50 text-purple-800 border-purple-300';
+    colorClasses = MARIGOLD;
     IconComponent = Award;
-    displayLabel = 'SENIOR VOLUNTEER ⭐';
+    displayLabel = 'Senior volunteer';
   } else if (level === 'COMMUNITY_LEAD') {
-    colorClasses = 'bg-amber-50 text-amber-900 border-amber-300';
-    IconComponent = ShieldCheck;
-    displayLabel = 'COMMUNITY LEAD 👑';
+    colorClasses = MARIGOLD;
+    IconComponent = Crown;
+    displayLabel = 'Community lead';
   } else if (level === 'ADMIN' || level === 'SUPER_ADMIN') {
-    colorClasses = 'bg-rose-50 text-[#C8382C] border-rose-300';
+    colorClasses = BRAND;
     IconComponent = ShieldAlert;
-    displayLabel = 'ADMIN 🛡️';
+    displayLabel = level === 'SUPER_ADMIN' ? 'Super admin' : 'Admin';
+  } else if (level === 'MODERATOR') {
+    colorClasses = BRAND;
+    IconComponent = ShieldCheck;
+    displayLabel = 'Moderator';
   }
+
+  const title = isVerified ? 'Verified by the Hateymalo team' : displayLabel;
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border transition-all ${colorClasses}`}
-      title={isVerified ? 'Super Admin Verified Account' : level}
+      className={`inline-flex items-center gap-1 rounded-full border align-middle font-semibold leading-none whitespace-nowrap ${
+        showLabel ? 'px-2 py-1 text-xs' : 'p-0.5'
+      } ${colorClasses}`}
+      title={title}
     >
-      <IconComponent className="w-3.5 h-3.5 shrink-0" />
-      {showLabel && <span>{displayLabel}</span>}
+      <IconComponent className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+      {showLabel ? <span>{displayLabel}</span> : <span className="sr-only">{displayLabel}</span>}
     </span>
   );
 };

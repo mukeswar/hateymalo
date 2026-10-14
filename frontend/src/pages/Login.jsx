@@ -2,13 +2,30 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { HeartHandshake, LogIn, Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+
+const PANEL_IMAGE = 'https://images.unsplash.com/photo-1549819363-10acf530e110?auto=format&fit=crop&w=1200&q=75';
+
+// Desktop-only photo panel beside the form
+const PhotoPanel = () => (
+  <aside className="hidden lg:block relative overflow-hidden rounded-[2rem] min-h-[36rem] bg-night" aria-hidden="true">
+    <img src={PANEL_IMAGE} alt="" className="absolute inset-0 w-full h-full object-cover" />
+    <div className="absolute inset-0 bg-gradient-to-t from-night/85 via-night/25 to-transparent" />
+    <div className="absolute inset-x-0 bottom-0 p-10 text-white">
+      <p className="deva font-display text-2xl xl:text-[1.75rem] font-semibold leading-snug">
+        मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।
+      </p>
+      <p className="mt-2 text-white/85 text-lg">Ask for help. Offer help. Change things together.</p>
+    </div>
+  </aside>
+);
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const { login } = useAuth();
   const { showToast } = useToast();
@@ -16,9 +33,11 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
+      setFormError('Please enter your email and password.');
       showToast('Please enter your email and password.', 'error');
       return;
     }
@@ -26,7 +45,7 @@ const Login = () => {
     setLoading(true);
     try {
       const loggedUser = await login(cleanEmail, password);
-      showToast('Welcome back to HAATEMALO!', 'success');
+      showToast('Welcome back to HATEYMALO!', 'success');
 
       if (['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(loggedUser?.role)) {
         navigate('/admin');
@@ -34,96 +53,96 @@ const Login = () => {
         navigate('/dashboard');
       }
     } catch (error) {
-      showToast(error.response?.data?.message || 'Invalid email or password. Please try again.', 'error');
+      const msg = error.response?.data?.message || 'Invalid email or password. Please try again.';
+      setFormError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md space-y-8 bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-xl relative">
-        
-        {/* Brand Header */}
-        <div className="text-center space-y-3">
-          <Link to="/" className="inline-block">
-            <img src="/logo.png" alt="हातेमालो (HAATEMALO)" className="h-16 mx-auto w-auto object-contain" />
-          </Link>
-          <h2 className="text-2xl font-black text-slate-900">Log In to HAATEMALO</h2>
-          <p className="text-xs text-slate-500 font-medium">"मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।"</p>
-        </div>
+    <div className="container-page py-8 sm:py-12">
+      <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 items-stretch">
+        <div className="flex items-center justify-center">
+          <div className="w-full max-w-md animate-rise">
+            <p className="eyebrow deva">फेरि स्वागत छ</p>
+            <h1 className="mt-2 text-4xl sm:text-5xl font-bold text-ink">Welcome back</h1>
+            <p className="mt-3 text-muted text-lg">Log in to see your requests, the drives you've joined and new activity.</p>
 
-        {/* Security Badge */}
-        <div className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-2xs">
-          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>256-Bit SSL Encrypted & Protected Login</span>
-        </div>
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              {formError && (
+                <div role="alert" className="flex items-start gap-2.5 rounded-2xl bg-brand-tint text-brand-dark border border-brand/20 px-4 py-3 text-sm font-medium">
+                  <AlertCircle className="w-[18px] h-[18px] shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your.email@example.com"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] focus:ring-1 focus:ring-[#C8382C] rounded-2xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all"
-              />
-            </div>
-          </div>
+              <div>
+                <label htmlFor="login-email" className="field-label">Email address</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="field pl-10"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-[#C8382C] focus:ring-1 focus:ring-[#C8382C] rounded-2xl pl-10 pr-11 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-700 transition-colors"
-                title={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <div>
+                <label htmlFor="login-password" className="field-label">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Your password"
+                    className="field pl-10 pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-paper-deep transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
+                    aria-controls="login-password"
+                  >
+                    {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden="true" /> : <Eye className="w-[18px] h-[18px]" aria-hidden="true" />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+                {loading ? 'Logging in…' : 'Log in'}
+                {!loading && <ArrowRight className="w-5 h-5" aria-hidden="true" />}
               </button>
-            </div>
+            </form>
+
+            <p className="mt-8 pt-6 border-t border-sand text-ink-soft">
+              New to Hateymalo?{' '}
+              <Link to="/register" className="font-semibold text-brand hover:text-brand-dark underline-offset-4 hover:underline">
+                Create an account
+              </Link>
+            </p>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 px-4 rounded-2xl font-bold terracotta-btn text-white shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-          >
-            {loading ? 'Authenticating...' : 'Log In Safely'} <ArrowRight className="w-4 h-4" />
-          </button>
-        </form>
-
-        <div className="text-center space-y-2 pt-2 border-t border-slate-100">
-          <p className="text-xs text-slate-500">
-            Don't have an account yet?{' '}
-            <Link to="/register" className="font-bold text-[#C8382C] hover:underline">
-              Register now
-            </Link>
-          </p>
-          <p className="text-[10px] text-slate-400 font-medium">
-            🔒 All login attempts are rate-limited & monitored for account safety.
-          </p>
         </div>
 
+        <PhotoPanel />
       </div>
     </div>
   );

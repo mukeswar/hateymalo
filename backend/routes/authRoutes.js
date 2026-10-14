@@ -5,6 +5,7 @@ const {
   loginUser,
   getMe,
   updateProfile,
+  changePassword,
   getUserById,
   getPublicMembers,
 } = require('../controllers/authController');
@@ -14,6 +15,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);
+router.put('/password', protect, changePassword);
 router.get('/members', getPublicMembers);
 router.get('/user/:id', getUserById);
 

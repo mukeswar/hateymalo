@@ -1,122 +1,119 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { HeartHandshake, Heart, ShieldCheck, Mail, MapPin, Facebook, Youtube, Instagram, Twitter } from 'lucide-react';
+import { Mail, MapPin, ShieldCheck, Heart, ArrowUpRight } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
+
+const COLUMNS = [
+  {
+    title: 'Get involved',
+    links: [
+      { to: '/explore', label: 'Help requests' },
+      { to: '/categories', label: 'Causes' },
+      { to: '/events', label: 'Events' },
+      { to: '/create-post', label: 'Ask or offer help' },
+    ],
+  },
+  {
+    title: 'Community',
+    links: [
+      { to: '/blogs', label: 'Stories' },
+      { to: '/organizations', label: 'Organizations' },
+      { to: '/members', label: 'Members' },
+      { to: '/search', label: 'Search' },
+    ],
+  },
+  {
+    title: 'About',
+    links: [
+      { to: '/about', label: 'Our mission' },
+      { to: '/about#guidelines', label: 'Community guidelines' },
+      { to: '/donate', label: 'Transparency', requiresDonations: true },
+    ],
+  },
+];
 
 const Footer = () => {
+  const { settings } = useSettings();
+  const donationsOn = settings?.allowPublicDonations !== false;
+  const email = settings?.contactEmail || 'support@hateymalo.com';
+
   return (
-    <footer className="bg-white border-t border-slate-200 text-slate-600 pt-16 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        
-        {/* Main Columns Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
-          
-          {/* Brand Col */}
-          <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="inline-block">
-              <img src="/logo.png" alt="हातेमालो (HAATEMALO)" className="h-14 w-auto object-contain" />
+    <footer className="relative bg-night text-[#D9D0C4] mt-24 overflow-hidden">
+      {/* Decorative hand-in-hand mark */}
+      <img
+        src="/logo-mark.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute -right-16 -bottom-20 w-80 opacity-[0.05] pointer-events-none select-none"
+      />
+
+      <div className="container-page relative pt-16 pb-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-5 space-y-5">
+            <Link to="/" className="inline-flex items-center gap-3 rounded-xl" aria-label="Hateymalo home">
+              <span className="w-12 h-12 rounded-2xl bg-white/95 flex items-center justify-center">
+                <img src="/logo-mark.png" alt="" className="w-9 h-9 object-contain" />
+              </span>
+              <span className="font-display text-3xl font-bold text-white leading-none">हातेमालो</span>
             </Link>
 
-            <p className="text-base font-extrabold text-[#C8382C]">
-              "मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।"
+            <p className="font-display text-xl text-white/90 leading-snug deva max-w-md">
+              {settings?.tagline || 'मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।'}
+            </p>
+            <p className="text-sm leading-relaxed max-w-md text-[#B5AB9E]">
+              A free community platform where people across Nepal ask for help, offer their time and skills, and
+              organise around the causes they care about — hand in hand.
             </p>
 
-            <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
-              Nepal's official non-profit community platform where citizens, volunteers, and NGOs collaborate for emergency aid, tree plantation, student tutoring, and civic initiatives.
-            </p>
-
-            <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
-              <MapPin className="w-4 h-4 text-[#C8382C]" /> Kathmandu, Nepal • <ShieldCheck className="w-4 h-4 text-emerald-600" /> 100% Voluntary & Transparent
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#B5AB9E]">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-marigold" aria-hidden="true" /> Nepal
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#7BC0A6]" aria-hidden="true" /> Every post reviewed by moderators
+              </span>
             </div>
+          </div>
 
-            {/* SOCIAL MEDIA LINKS */}
-            <div className="pt-3 space-y-2">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Join us on social media</p>
-              <div className="flex items-center gap-2.5">
-                <a
-                  href="https://facebook.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Join us on Facebook"
-                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-[#1877F2] text-slate-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-2xs hover:scale-110"
-                >
-                  <Facebook className="w-4.5 h-4.5" />
-                </a>
-                <a
-                  href="https://youtube.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Subscribe on YouTube"
-                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-[#FF0000] text-slate-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-2xs hover:scale-110"
-                >
-                  <Youtube className="w-4.5 h-4.5" />
-                </a>
-                <a
-                  href="https://instagram.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Follow us on Instagram"
-                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-[#E4405F] text-slate-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-2xs hover:scale-110"
-                >
-                  <Instagram className="w-4.5 h-4.5" />
-                </a>
-                <a
-                  href="https://x.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Follow us on X (Twitter)"
-                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-black text-slate-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-2xs hover:scale-110"
-                >
-                  <Twitter className="w-4.5 h-4.5" />
-                </a>
+          <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8">
+            {COLUMNS.map((col) => (
+              <div key={col.title}>
+                <h2 className="font-sans text-xs font-bold uppercase tracking-[0.16em] text-white/60 mb-4">{col.title}</h2>
+                <ul className="space-y-2.5">
+                  {col.links
+                    .filter((l) => !l.requiresDonations || donationsOn)
+                    .map((l) => (
+                      <li key={l.label}>
+                        <Link to={l.to} className="text-sm text-[#D9D0C4] hover:text-white transition-colors">
+                          {l.label}
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
               </div>
+            ))}
+
+            <div className="col-span-2 sm:col-span-3 card !bg-white/5 !border-white/10 !shadow-none p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-white font-semibold">Questions, partnerships or a safety concern?</p>
+                <p className="text-sm text-[#B5AB9E]">We read every message.</p>
+              </div>
+              <a href={`mailto:${email}`} className="btn btn-light btn-sm self-start sm:self-auto">
+                <Mail className="w-4 h-4" aria-hidden="true" /> {email}
+              </a>
             </div>
-
-          </div>
-
-          {/* Column 1: Platform */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Platform</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/explore" className="hover:text-[#C8382C] transition-colors">Explore Initiatives</Link></li>
-              <li><Link to="/categories" className="hover:text-[#C8382C] transition-colors">Activities Directory</Link></li>
-              <li><Link to="/events" className="hover:text-[#C8382C] transition-colors">Official Events</Link></li>
-              <li><Link to="/blogs" className="hover:text-[#C8382C] transition-colors">Community Stories</Link></li>
-            </ul>
-          </div>
-
-          {/* Column 2: Community */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Community</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/members" className="hover:text-[#C8382C] transition-colors">Active Members</Link></li>
-              <li><Link to="/organizations" className="hover:text-[#C8382C] transition-colors">NGOs & Partner Groups</Link></li>
-              <li><Link to="/create-post" className="hover:text-[#C8382C] transition-colors">Post Your Request</Link></li>
-              <li><Link to="/search" className="hover:text-[#C8382C] transition-colors">Universal Search</Link></li>
-            </ul>
-          </div>
-
-          {/* Column 3: Support */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Support</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/donate" className="text-amber-700 font-semibold hover:underline">Voluntary Platform Donation</Link></li>
-              <li><Link to="/about" className="hover:text-[#C8382C] transition-colors">About HAATEMALO</Link></li>
-              <li><a href="mailto:support@haatemalo.org" className="hover:text-[#C8382C] transition-colors flex items-center gap-1"><Mail className="w-3 h-3 text-[#C8382C]" /> Contact Support</a></li>
-            </ul>
-          </div>
-
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} HAATEMALO (हातेमालो). Built for community collaboration in Nepal.</p>
-          <div className="flex items-center gap-6">
-            <Link to="/about" className="hover:text-slate-700">Community Guidelines</Link>
-            <Link to="/about" className="hover:text-slate-700">Privacy & Safety</Link>
-            <Link to="/donate" className="hover:text-amber-700 flex items-center gap-1"><Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" /> Support Us</Link>
           </div>
         </div>
 
+        <div className="mt-14 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-[#9C9286]">
+          <p>© {new Date().getFullYear()} Hateymalo (हातेमालो). Built for community collaboration in Nepal.</p>
+          {donationsOn && (
+            <Link to="/donate" className="inline-flex items-center gap-1.5 hover:text-white transition-colors">
+              <Heart className="w-4 h-4 text-brand fill-brand" aria-hidden="true" /> Support the platform
+              <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
       </div>
     </footer>
   );

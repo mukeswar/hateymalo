@@ -1,34 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import API from '../services/api';
 import PostCard from '../components/PostCard';
+import VerificationBadge from '../components/VerificationBadge';
+import Avatar from '../components/ui/Avatar';
+import { Reveal, Tilt, CountUp, useParallax } from '../components/ui/motion';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 import {
-  Search,
-  HeartHandshake,
-  Users,
-  CheckCircle2,
-  Sparkles,
   ArrowRight,
+  ArrowUpRight,
+  HandHeart,
+  HandHelping,
+  HeartHandshake,
   ShieldCheck,
-  Calendar,
-  BookOpen,
-  Megaphone,
-  Heart,
-  TreePine,
+  CalendarDays,
   MapPin,
   Clock,
-  UserCheck,
-  Quote,
-  Check,
-  HelpCircle,
-  ChevronDown,
-  Award,
+  Megaphone,
+  Plus,
+  Minus,
+  BadgeCheck,
+  ReceiptText,
+  Flag,
+  Users,
   Building2,
-  Zap,
-  GraduationCap,
-  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
+
+// Authentic, free-licensed photography from Nepal (Unsplash License).
+const IMG = {
+  gathering: 'https://images.unsplash.com/photo-1763733595228-7d0a3e35dbad?auto=format&fit=crop&w=1200&q=75',
+  neighbours: 'https://images.unsplash.com/photo-1549819363-10acf530e110?auto=format&fit=crop&w=700&q=75',
+  children: 'https://images.unsplash.com/photo-1763735135003-6710ca6872ea?auto=format&fit=crop&w=600&q=75',
+  terraces: 'https://images.unsplash.com/photo-1572109801525-0bb0272e8579?auto=format&fit=crop&w=1800&q=70',
+};
+
+// The CMS default hero image predates the redesign; only use the CMS value when an admin changed it.
+const LEGACY_DEFAULT_HERO = 'photo-1593113598332';
+
+const stripHtml = (s = '') => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+const npr = (n) => `रु ${Number(n || 0).toLocaleString('en-IN')}`;
+
+const SectionHeader = ({ eyebrow, title, intro, action }) => (
+  <Reveal className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-10">
+    <div className="max-w-2xl space-y-3">
+      <span className="eyebrow deva">{eyebrow}</span>
+      <h2 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-ink leading-[1.1]">{title}</h2>
+      {intro && <p className="text-muted text-base sm:text-lg leading-relaxed">{intro}</p>}
+    </div>
+    {action}
+  </Reveal>
+);
+
+const ViewAll = ({ to, children }) => (
+  <Link to={to} className="group inline-flex items-center gap-1.5 font-semibold text-ink hover:text-brand transition-colors shrink-0">
+    {children}
+    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+  </Link>
+);
 
 const Home = () => {
   const [latestPosts, setLatestPosts] = useState([]);
@@ -36,732 +66,618 @@ const Home = () => {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [latestBlogs, setLatestBlogs] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeFaq, setActiveFaq] = useState(0);
 
   const { settings } = useSettings();
-  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const donationsOn = settings?.allowPublicDonations !== false;
+
+  const backLayer = useParallax(0.05);
+  const frontLayer = useParallax(-0.06);
 
   useEffect(() => {
+    const safe = (p) => p.catch(() => null);
     const fetchData = async () => {
       try {
-        const [postsRes, featuredRes, eventsRes, blogsRes, annRes, statsRes] = await Promise.all([
-          API.get('/posts?sort=newest'),
-          API.get('/posts?featured=true'),
-          API.get('/events?status=UPCOMING'),
-          API.get('/blogs'),
-          API.get('/announcements'),
-          API.get('/stats'),
+        const [postsRes, featuredRes, eventsRes, blogsRes, annRes, statsRes, campaignsRes, orgsRes] = await Promise.all([
+          safe(API.get('/posts?sort=newest')),
+          safe(API.get('/posts?featured=true')),
+          safe(API.get('/events?status=UPCOMING')),
+          safe(API.get('/blogs')),
+          safe(API.get('/announcements')),
+          safe(API.get('/stats')),
+          safe(API.get('/donations/campaigns')),
+          safe(API.get('/search?entityType=ORGANIZATIONS')),
         ]);
 
-        if (postsRes.data.success) setLatestPosts(postsRes.data.data.slice(0, 5));
-        if (featuredRes.data.success) setFeaturedPosts(featuredRes.data.data.slice(0, 5));
-        if (eventsRes.data.success) setUpcomingEvents(eventsRes.data.data.slice(0, 3));
-        if (blogsRes.data.success) setLatestBlogs(blogsRes.data.data.slice(0, 3));
-        if (annRes.data.success) setAnnouncements(annRes.data.data);
-        if (statsRes.data.success) setStats(statsRes.data.data);
-      } catch (error) {
-        console.error('Home data fetch error:', error);
+        if (postsRes?.data.success) setLatestPosts(postsRes.data.data);
+        if (featuredRes?.data.success) setFeaturedPosts(featuredRes.data.data);
+        if (eventsRes?.data.success) setUpcomingEvents(eventsRes.data.data.slice(0, 3));
+        if (blogsRes?.data.success) setLatestBlogs(blogsRes.data.data.slice(0, 3));
+        if (annRes?.data.success) setAnnouncements(annRes.data.data);
+        if (statsRes?.data.success) setStats(statsRes.data.data);
+        if (campaignsRes?.data.success) setCampaigns(campaignsRes.data.data.filter((c) => c.status === 'ACTIVE').slice(0, 3));
+        if (orgsRes?.data.success) setOrganizations((orgsRes.data.data.organizations || []).slice(0, 4));
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  const fmt = (n) => (n === null || n === undefined ? '—' : n.toLocaleString());
+  // Admin-featured posts first, then the newest ones, without duplicates.
+  const openRequests = [...featuredPosts, ...latestPosts.filter((p) => !featuredPosts.some((f) => f._id === p._id))].slice(0, 6);
 
-  // Show admin-featured posts if any exist; otherwise fall back to newest.
-  const featured = featuredPosts.length > 0 ? featuredPosts : latestPosts;
+  // Real people who recently asked for or organised help — used as social proof.
+  const recentPeople = [];
+  latestPosts.forEach((p) => {
+    if (p.creator && !recentPeople.some((x) => x._id === p.creator._id)) recentPeople.push(p.creator);
+  });
 
-  const CATEGORIES = [
+  const heroImage =
+    settings?.heroImage && !settings.heroImage.includes(LEGACY_DEFAULT_HERO) ? settings.heroImage : IMG.gathering;
+  const heroLines = (settings?.heroHeadline || 'मद्दत मागौँ।\nसहयोग गरौँ।\nसँगै परिवर्तन ल्याऔँ।')
+    .split(/\n|(?<=।)\s+/)
+    .filter(Boolean);
+  const latestActivity = latestPosts[0];
+
+  const impact = [
+    { label: 'Community members', ne: 'सदस्य', value: stats?.totalMembers, icon: Users, tone: 'text-ink' },
+    { label: 'Helpers who joined a drive', ne: 'सहयोगी', value: stats?.peopleConnected, icon: HandHelping, tone: 'text-brand' },
+    { label: 'Activities organised', ne: 'गतिविधि', value: stats?.totalActivities, icon: Sparkles, tone: 'text-marigold-text' },
+    { label: 'Places reached', ne: 'स्थान', value: stats?.communitiesReached, icon: MapPin, tone: 'text-pine' },
+  ];
+
+  const faqs = [
     {
-      title: 'Education & Learning',
-      desc: 'Free assignment tutoring, book drives, and youth mentorship.',
-      img: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
-      tag: 'Education',
+      q: 'Is Hateymalo free to use?',
+      a: 'Yes. Creating an account, asking for help, offering help, joining activities and registering an organisation are all free. Donations are always voluntary.',
     },
     {
-      title: 'Community Cleaning',
-      desc: 'Bagmati river cleaning, plastic awareness, and neighborhood sanitation.',
-      img: 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?auto=format&fit=crop&w=800&q=80',
-      tag: 'Cleaning',
+      q: 'How do you keep posts genuine and safe?',
+      a: 'Every help request is reviewed by a moderator before it goes public. Posts that are commercial, misleading or unsafe are rejected with a reason, and anyone can report a post, comment or profile for review.',
     },
     {
-      title: 'Environment & Forestry',
-      desc: 'Tree plantation, landslide prevention, and green civic drives.',
-      img: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80',
-      tag: 'Plantation',
+      q: 'Can I organise a drive or event in my own town or village?',
+      a: 'Yes. Any registered member can post a help request or community activity anywhere in Nepal — a clean-up, tutoring, a blood donation camp, relief collection, and more.',
     },
     {
-      title: 'Social & Disaster Help',
-      desc: 'Monsoon flood relief, food distribution, and emergency warm clothes.',
-      img: 'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=800&q=80',
-      tag: 'Disaster Relief',
+      q: 'What do member levels and badges mean?',
+      a: 'As you take part, your profile shows your contribution: members grow from New Member to Trusted and Verified Member, and earn badges for the kind of help they give. Verified accounts are checked by the Hateymalo team.',
     },
     {
-      title: 'Projects & Collaboration',
-      desc: 'Joint community initiatives, local repairs, and volunteer networks.',
-      img: 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=800&q=80',
-      tag: 'Community Activity',
-    },
-    {
-      title: 'Events & Campaigns',
-      desc: 'Official assemblies, blood donation camps, and civic rallies.',
-      img: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80',
-      tag: 'Blood Donation',
+      q: 'How can an NGO or community group get verified?',
+      a: 'Register as an organisation with your official details. Once the Hateymalo team verifies them, your profile shows a verified badge and appears in the organisation directory.',
     },
   ];
 
   return (
-    <div className="space-y-24 pb-20 overflow-hidden bg-[#FAFAFA] text-slate-900">
-      
-      {/* ADMIN ANNOUNCEMENT BANNER */}
+    <div className="overflow-x-clip">
+      {/* ANNOUNCEMENT */}
       {announcements.length > 0 && (
-        <div className="bg-amber-100 border-b border-amber-300 px-4 py-3 text-center">
-          <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 text-xs sm:text-sm text-amber-900">
-            <Megaphone className="w-4 h-4 text-amber-700 shrink-0" />
-            <span className="font-bold text-amber-950">ANNOUNCEMENT:</span>
-            <span className="truncate">{announcements[0].title} — {announcements[0].content}</span>
+        <div className="bg-marigold-tint border-b border-marigold/30">
+          <div className="container-page py-2.5 flex items-center justify-center gap-2.5 text-sm text-ink-soft">
+            <Megaphone className="w-4 h-4 text-marigold-text shrink-0" aria-hidden="true" />
+            <span className="font-semibold text-ink">{announcements[0].title}</span>
+            <span className="hidden sm:inline truncate text-muted">— {announcements[0].content}</span>
           </div>
         </div>
       )}
 
-      {/* 1. HERO SECTION (MASTER TWO-COLUMN EDITORIAL COMPOSITION) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          {/* LEFT SIDE CONTENT */}
-          <div className="lg:col-span-7 space-y-6 text-left">
-            
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full terracotta-badge text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5" />
-              {settings?.heroSmallLabel || 'Together, We Can Make a Difference'}
-            </div>
+      {/* ============ HERO ============ */}
+      <section className="relative grain">
+        <div className="container-page pt-10 sm:pt-16 lg:pt-20 pb-16 lg:pb-24 grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          <div className="lg:col-span-6 xl:col-span-6 space-y-7 relative z-10">
+            <span className="chip bg-white border border-sand text-ink-soft shadow-sm animate-in animate-rise">
+              <span className="w-2 h-2 rounded-full bg-pine" aria-hidden="true" />
+              {settings?.heroSmallLabel || 'Together, we can make a difference'}
+            </span>
 
-            <div className="space-y-3">
-              <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-tight">
-                {settings?.heroHeadline ? (
-                  settings.heroHeadline.split('\n').map((line, i, arr) => (
-                    <React.Fragment key={i}>
-                      {i === arr.length - 1 ? (
-                        <span className="text-gradient-terracotta">{line}</span>
-                      ) : (
-                        <>{line}<br /></>
-                      )}
-                    </React.Fragment>
-                  ))
-                ) : (
-                  <>
-                    मद्दत मागौँ।<br />
-                    सहयोग गरौँ।<br />
-                    <span className="text-gradient-terracotta">सँगै परिवर्तन ल्याऔँ।</span>
-                  </>
-                )}
-              </h1>
-
-              <p className="text-base sm:text-xl text-slate-600 max-w-xl font-normal leading-relaxed">
-                {settings?.heroDescription || 'हातेमालो is a community platform where people can ask for help, offer their skills, join meaningful activities, and create positive change together.'}
-              </p>
-            </div>
-
-            {/* BUTTONS */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link
-                to="/explore"
-                className="px-7 py-4 rounded-2xl text-sm font-bold terracotta-btn flex items-center gap-2 shadow-xl"
-              >
-                Explore Community <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/create-post"
-                className="px-7 py-4 rounded-2xl text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200 transition-all"
-              >
-                Create a Post
-              </Link>
-            </div>
-
-            {/* SOCIAL PROOF */}
-            <div className="pt-6 border-t border-slate-200 flex items-center gap-4 text-xs text-slate-600">
-              <div className="flex -space-x-2">
-                <img className="w-8 h-8 rounded-full border-2 border-white" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="User" />
-                <img className="w-8 h-8 rounded-full border-2 border-white" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80" alt="User" />
-                <img className="w-8 h-8 rounded-full border-2 border-white" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" alt="User" />
-              </div>
-              <p className="font-medium text-slate-600">
-                Join <strong className="text-slate-900 font-bold">{stats?.totalMembers ? `${fmt(stats.totalMembers)}+` : 'our'}</strong> people helping people and building stronger communities.
-              </p>
-            </div>
-
-          </div>
-
-          {/* RIGHT SIDE HERO IMAGE COMPOSITION */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-white group">
-              <img
-                src={settings?.heroImage || 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1000&q=80'}
-                alt="Community Volunteers Nepal"
-                className="w-full h-[480px] object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
-
-              {/* Overlay Badge 1 */}
-              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-200 shadow-xl flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-bold text-slate-900">Together for Change</span>
-              </div>
-
-              {/* Overlay Badge 2 */}
-              <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-slate-200 space-y-1 shadow-lg">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-emerald-600" /> {fmt(stats?.peopleConnected)} Volunteers Joined
-                  </span>
-                  <span className="text-[10px] font-bold uppercase text-amber-700">Community Drives</span>
-                </div>
-                <p className="text-[11px] text-slate-600 line-clamp-1">Bagmati river bank restoration & plastic collection drive</p>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* 2. SECTION 1 — COMMUNITY IMPACT */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-12 border-y border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-8 text-center bg-white rounded-3xl border shadow-sm">
-          <div className="space-y-1">
-            <p className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">{fmt(stats?.totalMembers)}</p>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Community Members</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-4xl sm:text-5xl font-black text-[#C8382C] tracking-tight">{fmt(stats?.peopleConnected)}</p>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">People Connected</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-4xl sm:text-5xl font-black text-amber-600 tracking-tight">{fmt(stats?.totalActivities)}</p>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Activities Created</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-4xl sm:text-5xl font-black text-emerald-600 tracking-tight">{fmt(stats?.communitiesReached)}</p>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Communities Reached</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. SECTION 2 — HOW HAATEMALO WORKS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#C8382C]">Simple & Meaningful</span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">How HAATEMALO Works</h2>
-          <p className="text-sm text-slate-600">Connecting people who need help with volunteers who want to make a difference.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
-          <div className="bg-white p-8 rounded-3xl space-y-4 border border-slate-200 shadow-sm relative">
-            <span className="text-4xl font-black text-[#C8382C]/30">Step 01</span>
-            <h3 className="text-xl font-bold text-slate-900 uppercase tracking-wide">POST YOUR NEED OR IDEA</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Tell the community what help, project, or volunteer activity you need assistance with.
-            </p>
-          </div>
-
-          <div className="bg-white p-8 rounded-3xl space-y-4 border border-slate-200 shadow-sm relative">
-            <span className="text-4xl font-black text-amber-600/30">Step 02</span>
-            <h3 className="text-xl font-bold text-slate-900 uppercase tracking-wide">PEOPLE JOIN</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Members who are interested can offer their skills, support, time, or voluntary donations.
-            </p>
-          </div>
-
-          <div className="bg-white p-8 rounded-3xl space-y-4 border border-slate-200 shadow-sm relative">
-            <span className="text-4xl font-black text-emerald-600/30">Step 03</span>
-            <h3 className="text-xl font-bold text-slate-900 uppercase tracking-wide">CREATE IMPACT</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Work together, share updates, and create meaningful results that transform neighborhoods.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* NEW SECTION A — WHY CHOOSE HAATEMALO (TRUST & FEATURE PILLARS) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-widest text-teal-700">Built On Trust & Community</span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Why People Love HAATEMALO</h2>
-          <p className="text-sm text-slate-600">The premier platform empowering citizen-led collaboration across Nepal.</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 hover:border-rose-300 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#C8382C] flex items-center justify-center border border-rose-200">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">100% Moderated & Safe</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Every request is reviewed by verified administrators to prevent commercial spam and ensure genuine help.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 hover:border-teal-300 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-200">
-              <HeartHandshake className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Direct Citizen Support</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Connect directly with volunteers and neighbors in your town without middlemen or agency commissions.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 hover:border-amber-300 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
-              <Award className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Volunteer Recognition</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Earn civic badges like Golden Volunteer and Eco Guardian as you contribute time, skills, and support.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 hover:border-sky-300 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-200">
-              <Zap className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Real-Time Alerts</h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Get instant notifications when someone joins your drive, leaves a comment, or posts a local emergency.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. SECTION 3 — EXPLORE WHAT YOU CAN DO */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Categories</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 mt-1">Explore What You Can Do</h2>
-          </div>
-          <Link to="/categories" className="text-xs font-bold text-[#C8382C] hover:underline flex items-center gap-1">
-            View All Categories <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {CATEGORIES.map((cat, i) => (
-            <Link
-              key={i}
-              to={`/explore?category=${encodeURIComponent(cat.tag)}`}
-              className="group relative rounded-3xl overflow-hidden h-72 border border-slate-200 hover:border-[#C8382C]/50 transition-all duration-500 shadow-md flex flex-col justify-end p-6"
-            >
-              <img
-                src={cat.img}
-                alt={cat.title}
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-
-              <div className="relative z-10 space-y-2 text-white">
-                <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-white/90 text-slate-900">
-                  {cat.tag}
-                </span>
-                <h3 className="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">
-                  {cat.title}
-                </h3>
-                <p className="text-xs text-slate-200 line-clamp-2 leading-relaxed">
-                  {cat.desc}
-                </p>
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-300 pt-1">
-                  Explore Category <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* 5. SECTION 4 — FEATURED COMMUNITY STORIES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-700">Featured Action</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 mt-1">Featured Community Stories</h2>
-          </div>
-          <Link to="/explore" className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">
-            See All Posts <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {featured.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-            {/* LARGE ASYMMETRIC FEATURED STORY */}
-            <div className="lg:col-span-7">
-              <Link to={`/post/${featured[0]._id}`} className="group block relative rounded-3xl overflow-hidden h-[420px] border border-slate-200 shadow-lg">
-                <img
-                  src={featured[0].images?.[0] || 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1000&q=80'}
-                  alt={featured[0].title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
-
-                <div className="absolute bottom-6 left-6 right-6 space-y-3 z-10 text-white">
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/90 text-slate-900">
-                    Featured • {featured[0].category}
-                  </span>
-                  <h3 className="text-2xl font-extrabold text-white group-hover:text-amber-300 transition-colors">
-                    {featured[0].title}
-                  </h3>
-                  <div className="flex items-center justify-between text-xs text-slate-200 border-t border-white/20 pt-3">
-                    <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-rose-400" /> {featured[0].location}</span>
-                    <div className="flex items-center gap-4 font-bold">
-                      <span className="text-rose-300">❤️ {featured[0].interestedUsers?.length || 0} Interested</span>
-                      <span className="text-teal-300">🤝 {featured[0].joinedUsers?.length || 0} Joined</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* SECONDARY STORIES LIST */}
-            <div className="lg:col-span-5 space-y-4">
-              {featured.slice(1, 4).map((post) => (
-                <Link
-                  key={post._id}
-                  to={`/post/${post._id}`}
-                  className="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-[#C8382C]/40 transition-all block"
+            <h1 className="deva font-display font-bold text-ink text-[2.6rem] leading-[1.15] sm:text-6xl sm:leading-[1.1] xl:text-[4.3rem] tracking-tight">
+              {heroLines.map((line, i) => (
+                <span
+                  key={i}
+                  className={`block animate-in animate-rise ${i === heroLines.length - 1 ? 'text-brand' : ''}`}
+                  style={{ animationDelay: `${120 + i * 110}ms` }}
                 >
-                  <img
-                    src={post.images?.[0] || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=300&q=80'}
-                    alt={post.title}
-                    className="w-20 h-20 rounded-xl object-cover shrink-0"
-                  />
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase">{post.category}</span>
-                    <h4 className="font-bold text-slate-900 text-sm group-hover:text-[#C8382C] transition-colors line-clamp-1">
-                      {post.title}
-                    </h4>
-                    <p className="text-[11px] text-slate-500">{post.location} • {post.joinedUsers?.length || 0} Joined</p>
-                  </div>
-                </Link>
+                  {line}
+                </span>
               ))}
+            </h1>
+
+            <p className="text-lg sm:text-xl text-muted leading-relaxed max-w-xl animate-in animate-rise" style={{ animationDelay: '480ms' }}>
+              {settings?.heroDescription ||
+                'Hateymalo is a community platform where people can ask for help, offer their skills, join meaningful activities, and create positive change together.'}
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 animate-in animate-rise" style={{ animationDelay: '600ms' }}>
+              <Link to="/explore" className="btn btn-primary btn-lg">
+                <HandHeart className="w-5 h-5" aria-hidden="true" /> I want to help
+              </Link>
+              <Link to={isAuthenticated ? '/create-post' : '/register'} className="btn btn-ghost btn-lg">
+                <HandHelping className="w-5 h-5" aria-hidden="true" /> I need help
+              </Link>
             </div>
 
+            {recentPeople.length > 0 && (
+              <div className="flex items-center gap-4 pt-2 animate-in" style={{ animationDelay: '750ms' }}>
+                <div className="flex -space-x-2.5">
+                  {recentPeople.slice(0, 4).map((p) => (
+                    <Avatar key={p._id} name={p.name} src={p.profilePicture} size="md" className="ring-[3px] ring-paper" />
+                  ))}
+                </div>
+                <p className="text-sm text-muted leading-snug">
+                  <strong className="text-ink font-semibold">
+                    {stats?.totalMembers ? `${stats.totalMembers.toLocaleString()} neighbours` : 'Neighbours'}
+                  </strong>{' '}
+                  are already helping each other here.
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-500 text-sm">
-            No featured stories available.
+
+          {/* Layered photo composition */}
+          <div className="lg:col-span-6 xl:col-span-6 relative h-[420px] sm:h-[520px] lg:h-[600px]" aria-hidden="true">
+            <div ref={backLayer} className="absolute right-0 top-0 w-[78%] h-[86%]">
+              <div className="w-full h-full rounded-[2rem] overflow-hidden shadow-[var(--shadow-lift)] animate-in animate-pop">
+                <img src={heroImage} alt="" className="w-full h-full object-cover" fetchpriority="high" />
+              </div>
+            </div>
+
+            <div ref={frontLayer} className="absolute left-0 bottom-0 w-[46%] h-[52%]">
+              <div className="w-full h-full rounded-[1.6rem] overflow-hidden border-[6px] border-paper shadow-[var(--shadow-lift)] animate-in animate-pop" style={{ animationDelay: '200ms' }}>
+                <img src={IMG.neighbours} alt="" className="w-full h-full object-cover" />
+              </div>
+            </div>
+
+            <div className="absolute left-[6%] top-[10%] w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-[5px] border-paper shadow-[var(--shadow-lift)] animate-float hidden sm:block">
+              <img src={IMG.children} alt="" className="w-full h-full object-cover" />
+            </div>
+
+            {/* Live stat chip */}
+            <div className="absolute right-[4%] bottom-[20%] sm:bottom-[16%] card !rounded-2xl px-4 py-3 flex items-center gap-3 animate-in animate-rise" style={{ animationDelay: '700ms' }}>
+              <span className="w-10 h-10 rounded-xl bg-brand-tint text-brand flex items-center justify-center">
+                <HeartHandshake className="w-5 h-5" />
+              </span>
+              <span>
+                <span className="block font-display text-2xl font-bold text-ink leading-none">
+                  <CountUp value={stats?.peopleConnected} />
+                </span>
+                <span className="block text-xs text-muted mt-1">helpers joined community drives</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Latest activity ticker — real, newest public request */}
+        {latestActivity && (
+          <div className="container-page -mt-6 pb-4 relative z-10">
+            <Link
+              to={`/post/${latestActivity._id}`}
+              className="group card card-hover flex items-center gap-4 p-3 pr-5 max-w-2xl"
+            >
+              <span className="chip bg-pine-tint text-pine shrink-0">
+                <span className="relative flex w-2 h-2">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-pine opacity-60 motion-safe:animate-ping" />
+                  <span className="relative inline-flex w-2 h-2 rounded-full bg-pine" />
+                </span>
+                Latest
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink truncate group-hover:text-brand transition-colors">{latestActivity.title}</span>
+                <span className="block text-xs text-muted truncate">
+                  {latestActivity.location} · {latestActivity.joinedUsers?.length || 0} joined
+                </span>
+              </span>
+              <ArrowUpRight className="w-4 h-4 text-muted group-hover:text-brand shrink-0" aria-hidden="true" />
+            </Link>
           </div>
         )}
       </section>
 
-      {/* 6. SECTION 5 — UPCOMING EVENTS (CLEAN TIMELINE LIST) */}
-      {upcomingEvents.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-sky-700">Official Assemblies</span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">Upcoming Events</h2>
-            </div>
-            <Link to="/events" className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">
-              View All Events <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="space-y-4">
-            {upcomingEvents.map((ev) => (
-              <div
-                key={ev._id}
-                className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-sky-500/40 transition-all"
-              >
-                <div className="flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 text-sky-700 flex flex-col items-center justify-center font-bold shrink-0">
-                    <span className="text-xs uppercase">{new Date(ev.date).toLocaleDateString('ne-NP', { month: 'short' })}</span>
-                    <span className="text-xl font-black text-slate-900">{new Date(ev.date).getDate()}</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-teal-800 border border-slate-200">
-                      {ev.category}
-                    </span>
-                    <h3 className="text-lg font-bold text-slate-900">{ev.title}</h3>
-                    <p className="text-xs text-slate-500 flex items-center gap-4">
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-[#C8382C]" /> {ev.location}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-700" /> {ev.startTime}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 shrink-0">
-                  <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                    {ev.joinedUsers?.length || 0} / {ev.maxParticipants} Attendees
-                  </span>
-                  <Link
-                    to={`/events/${ev._id}`}
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold terracotta-btn shadow-md"
-                  >
-                    Join Event
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* NEW SECTION B — LATEST COMMUNITY BLOGS & INSIGHTS */}
-      {latestBlogs.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-purple-700">Insights & Guides</span>
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-1">Community Blog & Stories</h2>
-            </div>
-            <Link to="/blogs" className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">
-              View All Articles <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {latestBlogs.map((blog) => (
-              <Link
-                key={blog._id}
-                to={`/blogs/${blog._id}`}
-                className="group bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
-              >
-                <div className="relative h-48 overflow-hidden bg-slate-100">
-                  <img
-                    src={blog.coverImage || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80'}
-                    alt={blog.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-3 left-3 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-white/90 text-purple-800 shadow-xs">
-                    {blog.category || 'Story'}
-                  </span>
-                </div>
-
-                <div className="p-6 space-y-3 flex-grow flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <h3 className="font-extrabold text-slate-900 text-lg group-hover:text-purple-700 transition-colors line-clamp-2">
-                      {blog.title}
-                    </h3>
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                      {blog.content?.replace(/<[^>]+>/g, '') || 'Read this community article on civic action and volunteerism in Nepal.'}
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-bold text-slate-800">{blog.author?.name || 'HAATEMALO Editorial'}</span>
-                    <span className="text-[#C8382C] font-extrabold flex items-center gap-1">
-                      Read Article <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 7. SECTION 6 — HUMAN STORIES (EMOTIONAL QUOTE STORYTELLING) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-3xl p-8 sm:p-12 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border border-slate-200 shadow-md">
-          
-          <div className="lg:col-span-5 relative rounded-2xl overflow-hidden h-80 sm:h-96">
-            <img
-              src="https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?auto=format&fit=crop&w=800&q=80"
-              alt="Community Volunteers Cleaning"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div className="lg:col-span-7 space-y-6">
-            <Quote className="w-12 h-12 text-[#C8382C]" />
-            <blockquote className="text-xl sm:text-3xl font-extrabold text-slate-900 leading-snug">
-              "One small idea brought together 30 strangers to clean our neighborhood."
-            </blockquote>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              When heavy rains caused plastic pollution in our local stream, I posted a simple request on HAATEMALO. Within 48 hours, volunteers, local youth, and shopkeepers showed up with gloves and trash bags. That is the true power of community.
-            </p>
-            <div className="pt-4 border-t border-slate-100 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#C8382C] text-white flex items-center justify-center font-bold text-sm">
-                RS
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-sm">Ramesh Shrestha</p>
-                <p className="text-xs text-slate-500">Community Volunteer • Lalitpur</p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* NEW SECTION C — VERIFIED NGO & COMMUNITY PARTNERS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-indigo-700">Verified Organizations</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 mt-1">Our Civic & NGO Partners</h2>
-          </div>
-          <Link to="/organizations" className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">
-            Explore All Organizations <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-[#C8382C] flex items-center justify-center mx-auto border border-rose-200 font-black text-xl">
-              NY
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Nepal Youth Volunteers</h3>
-            <p className="text-xs text-slate-500">Youth-led civic action network for emergency relief & tutoring.</p>
-            <span className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verified NGO</span>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto border border-teal-200 font-black text-xl">
-              HG
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Himalayan Green Drive</h3>
-            <p className="text-xs text-slate-500">Eco organization dedicated to tree plantation & slope conservation.</p>
-            <span className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verified NGO</span>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mx-auto border border-sky-200 font-black text-xl">
-              CL
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Child Literacy Nepal</h3>
-            <p className="text-xs text-slate-500">Distributing books & conducting free tutoring for village schools.</p>
-            <span className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verified NGO</span>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border border-amber-200 font-black text-xl">
-              ER
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Emergency Relief Squad</h3>
-            <p className="text-xs text-slate-500">Rapid response team for monsoon landslides & winter warm clothing.</p>
-            <span className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verified NGO</span>
-          </div>
-        </div>
-      </section>
-
-      {/* NEW SECTION D — FREQUENTLY ASKED QUESTIONS (ACCORDION) */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="text-center space-y-3">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#C8382C]">Everything You Need to Know</span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Frequently Asked Questions</h2>
-          <p className="text-sm text-slate-600">Got questions about HAATEMALO? We have clear answers.</p>
-        </div>
-
-        <div className="space-y-3">
+      {/* ============ WAYS TO TAKE PART ============ */}
+      <section className="container-page py-20 lg:py-28">
+        <SectionHeader
+          eyebrow="तपाईं कसरी जोडिन सक्नुहुन्छ"
+          title="Every hand matters. Find yours."
+          intro="Whether you have an hour, a skill, or simply need a neighbour — there is a place for you here."
+        />
+        <div className="grid md:grid-cols-3 gap-5">
           {[
             {
-              q: 'Is HAATEMALO completely free for citizens and NGOs?',
-              a: 'Yes! Creating an account, posting help requests, joining events, and finding volunteer drives is 100% free forever for all citizens, students, and NGOs across Nepal.'
+              icon: HandHelping,
+              ne: 'मद्दत माग्नुहोस्',
+              title: 'Ask for help',
+              body: 'Share what you or your community needs. A moderator reviews it, then people nearby can offer support.',
+              to: isAuthenticated ? '/create-post' : '/register',
+              cta: 'Post a request',
+              tone: 'bg-brand-tint text-brand',
             },
             {
-              q: 'How does the post approval and safety system work?',
-              a: 'Every request submitted on HAATEMALO is reviewed by moderators before going public. Posts containing commercial advertising, spam, or scams are rejected with feedback to maintain 100% authentic community focus.'
+              icon: HandHeart,
+              ne: 'सहयोग गर्नुहोस्',
+              title: 'Offer your time & skills',
+              body: 'Browse open requests and activities — tutoring, clean-ups, relief drives — and join the ones that move you.',
+              to: '/explore',
+              cta: 'Browse requests',
+              tone: 'bg-pine-tint text-pine',
             },
-            {
-              q: 'Can I organize a volunteer drive or event in my city or village?',
-              a: 'Yes! Anyone registered can create a help request, tutoring session, blood donation event, or neighborhood cleanup drive anywhere in Nepal.'
-            },
-            {
-              q: 'How do volunteer badges and level upgrades work?',
-              a: 'As you create posts, join community activities, and receive positive ratings from organizers, your profile levels up automatically (Bronze, Silver, Gold, Diamond) and unlocks special badges.'
-            },
-            {
-              q: 'How can NGOs register as verified partner organizations?',
-              a: 'NGOs can register an account with their official details. Once verified by our super administrators, they receive a Verified NGO badge on their organization profile.'
-            }
-          ].map((item, idx) => (
-            <div
-              key={idx}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden transition-all"
-            >
-              <button
-                onClick={() => setActiveFaq(activeFaq === idx ? -1 : idx)}
-                className="w-full p-5 text-left font-bold text-slate-900 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-[#C8382C] shrink-0" />
-                  {item.q}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${activeFaq === idx ? 'rotate-180 text-[#C8382C]' : ''}`} />
-              </button>
-              {activeFaq === idx && (
-                <div className="px-5 pb-5 text-xs text-slate-600 leading-relaxed border-t border-slate-100 pt-3 animate-in fade-in duration-200">
-                  {item.a}
-                </div>
-              )}
-            </div>
+            donationsOn
+              ? {
+                  icon: HeartHandshake,
+                  ne: 'योगदान दिनुहोस्',
+                  title: 'Give to a cause',
+                  body: 'Support verified campaigns with full expense ledgers, so you can see exactly where every rupee goes.',
+                  to: '/donate',
+                  cta: 'See campaigns',
+                  tone: 'bg-marigold-tint text-marigold-text',
+                }
+              : {
+                  icon: CalendarDays,
+                  ne: 'कार्यक्रममा सहभागी हुनुहोस्',
+                  title: 'Join an event',
+                  body: 'Meet your neighbours at clean-ups, health camps and community gatherings near you.',
+                  to: '/events',
+                  cta: 'See events',
+                  tone: 'bg-marigold-tint text-marigold-text',
+                },
+          ].map((w, i) => (
+            <Reveal key={w.title} delay={i * 90}>
+              <Tilt max={5} className="h-full rounded-[var(--radius-card)]">
+                <Link to={w.to} className="group card card-hover h-full p-7 flex flex-col gap-5">
+                  <span className={`w-14 h-14 rounded-2xl flex items-center justify-center ${w.tone}`}>
+                    <w.icon className="w-7 h-7" aria-hidden="true" />
+                  </span>
+                  <div className="space-y-2 flex-grow">
+                    <p className="deva text-sm font-semibold text-muted">{w.ne}</p>
+                    <h3 className="text-2xl font-bold text-ink">{w.title}</h3>
+                    <p className="text-muted leading-relaxed">{w.body}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-ink group-hover:text-brand transition-colors">
+                    {w.cta} <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                  </span>
+                </Link>
+              </Tilt>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      {/* NEW SECTION E — BOTTOM HERO CTA BANNER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 rounded-3xl p-10 sm:p-16 text-center text-white space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-[#C8382C]/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-          
-          <div className="max-w-2xl mx-auto space-y-3 relative z-10">
-            <span className="text-xs font-extrabold uppercase tracking-widest text-amber-300">Ready to Make an Impact?</span>
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white">Start Your Community Drive Today</h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Whether you need volunteers for a local tree plantation, assignment tutoring, or emergency support — HAATEMALO connects you with people ready to help.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-4 pt-2 relative z-10">
-            <Link
-              to="/create-post"
-              className="px-7 py-3.5 rounded-2xl text-xs font-black bg-[#C8382C] hover:bg-[#b02e23] text-white shadow-xl transition-all hover:scale-105"
-            >
-              + Create a Community Post
-            </Link>
-            <Link
-              to="/explore"
-              className="px-7 py-3.5 rounded-2xl text-xs font-black bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all backdrop-blur-md"
-            >
-              Explore Active Drives
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 8. SECTION 7 — DONATION CTA */}
-      {settings?.allowPublicDonations !== false && (
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-emerald-50/60 p-10 sm:p-14 rounded-3xl text-center space-y-6 border border-emerald-200 shadow-sm">
-          <div className="max-w-2xl mx-auto space-y-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">Voluntary & Transparent</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Small Contributions. Real Change.</h2>
-            <p className="text-sm text-slate-700 leading-relaxed">
-              HAATEMALO is completely free for everyone. Voluntary donations help maintain server infrastructure, support emergency flood response, and empower youth volunteer initiatives across Nepal.
-            </p>
-          </div>
-
-          <div className="flex justify-center pt-2">
-            <Link
-              to="/donate"
-              className="px-8 py-4 rounded-2xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl transition-all hover:scale-105"
-            >
-              💚 Make a Voluntary Contribution
-            </Link>
+      {/* ============ IMPACT (real numbers) ============ */}
+      <section className="bg-white border-y border-sand">
+        <div className="container-page py-20 lg:py-24">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+            <Reveal className="lg:col-span-4 space-y-4">
+              <span className="eyebrow deva">हाम्रो साझा प्रभाव</span>
+              <h2 className="text-3xl sm:text-4xl font-bold text-ink leading-tight">Small acts, adding up.</h2>
+              <p className="text-muted leading-relaxed">
+                These numbers are live from the platform — every member, activity and helper counted here is real.
+              </p>
+              {donationsOn && stats?.totalDonations > 0 && (
+                <p className="text-sm text-ink-soft pt-2">
+                  <strong className="font-display text-xl text-pine">{npr(stats.totalDonations)}</strong> given voluntarily so far, every rupee
+                  tracked in a public ledger.
+                </p>
+              )}
+            </Reveal>
+            <div className="lg:col-span-8 grid grid-cols-2 gap-4">
+              {impact.map((s, i) => (
+                <Reveal key={s.label} delay={i * 80}>
+                  <div className={`surface-sunken p-6 sm:p-7 h-full ${i === 0 ? 'sm:row-span-1' : ''}`}>
+                    <s.icon className={`w-6 h-6 mb-4 ${s.tone}`} aria-hidden="true" />
+                    <p className={`font-display font-bold text-4xl sm:text-5xl leading-none ${s.tone}`}>
+                      <CountUp value={s.value} />
+                    </p>
+                    <p className="mt-3 text-sm font-semibold text-ink">{s.label}</p>
+                    <p className="deva text-xs text-muted">{s.ne}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
+
+      {/* ============ OPEN REQUESTS ============ */}
+      <section className="container-page py-20 lg:py-28">
+        <SectionHeader
+          eyebrow="अहिले सहयोग चाहिएको"
+          title="People near you, asking for a hand"
+          intro="Every request here has been reviewed by a moderator. Join one, or simply show you're interested."
+          action={<ViewAll to="/explore">See all requests</ViewAll>}
+        />
+        {loading ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[0, 1, 2].map((n) => (
+              <div key={n} className="h-[26rem] rounded-[var(--radius-card)] bg-paper-deep animate-pulse" />
+            ))}
+          </div>
+        ) : openRequests.length > 0 ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {openRequests.map((post, i) => (
+              <Reveal key={post._id} delay={(i % 3) * 90}>
+                <PostCard post={post} />
+              </Reveal>
+            ))}
+          </div>
+        ) : (
+          <div className="card p-12 text-center space-y-4">
+            <p className="font-display text-2xl text-ink">No open requests right now.</p>
+            <p className="text-muted">Be the first to start something in your community.</p>
+            <Link to="/create-post" className="btn btn-primary">
+              <Plus className="w-4 h-4" aria-hidden="true" /> Start a request
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* ============ CAMPAIGNS ============ */}
+      {donationsOn && campaigns.length > 0 && (
+        <section className="bg-pine text-white relative overflow-hidden">
+          <div className="absolute inset-0 grain opacity-40" aria-hidden="true" />
+          <div className="container-page relative py-20 lg:py-24">
+            <Reveal className="flex flex-col md:flex-row md:items-end justify-between gap-5 mb-10">
+              <div className="max-w-2xl space-y-3">
+                <span className="eyebrow deva !text-marigold">पारदर्शी अभियान</span>
+                <h2 className="text-3xl sm:text-4xl font-bold leading-tight">Campaigns you can see all the way through</h2>
+                <p className="text-white/75 text-lg">Each campaign publishes its expenses, so supporters can follow exactly how funds are used.</p>
+              </div>
+              <Link to="/donate" className="group inline-flex items-center gap-1.5 font-semibold text-white hover:text-marigold transition-colors">
+                All campaigns <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+              </Link>
+            </Reveal>
+
+            <div className="grid md:grid-cols-3 gap-5">
+              {campaigns.map((c, i) => {
+                const pct = c.goalAmount ? Math.min(100, Math.round((c.raisedAmount / c.goalAmount) * 100)) : 0;
+                return (
+                  <Reveal key={c._id} delay={i * 90}>
+                    <Link to="/donate" className="group block h-full rounded-[var(--radius-card)] bg-white/[0.07] border border-white/15 p-6 hover:bg-white/[0.11] transition-colors">
+                      <div className="flex items-center gap-2 text-sm text-white/70 mb-3">
+                        <Avatar name={c.creator?.name} src={c.creator?.profilePicture} size="xs" />
+                        <span className="truncate">{c.creator?.name}</span>
+                      </div>
+                      <h3 className="font-display text-xl font-semibold leading-snug mb-2 group-hover:text-marigold transition-colors">{c.title}</h3>
+                      <p className="text-sm text-white/70 line-clamp-2 mb-6">{c.description}</p>
+                      <div className="h-2 rounded-full bg-white/15 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Funds raised">
+                        <div className="progress-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="flex items-baseline justify-between mt-3 text-sm">
+                        <span>
+                          <strong className="font-display text-lg">{npr(c.raisedAmount)}</strong>
+                          <span className="text-white/60"> of {npr(c.goalAmount)}</span>
+                        </span>
+                        <span className="text-marigold font-semibold">{pct}%</span>
+                      </div>
+                    </Link>
+                  </Reveal>
+                );
+              })}
+            </div>
+          </div>
+        </section>
       )}
 
+      {/* ============ STORIES ============ */}
+      {latestBlogs.length > 0 && (
+        <section className="container-page py-20 lg:py-28">
+          <SectionHeader
+            eyebrow="समुदायका कथाहरू"
+            title="Stories from the people doing the work"
+            intro="Written by members and organisations about what they built together."
+            action={<ViewAll to="/blogs">Read all stories</ViewAll>}
+          />
+          <div className="grid lg:grid-cols-12 gap-6">
+            <Reveal className="lg:col-span-7">
+              <Link to={`/blogs/${latestBlogs[0]._id}`} className="group relative block h-[420px] lg:h-full min-h-[420px] rounded-[1.75rem] overflow-hidden">
+                <img
+                  src={latestBlogs[0].coverImage || IMG.neighbours}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] ease-[var(--ease-out-soft)] group-hover:scale-[1.04]"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-7 sm:p-9 text-white space-y-3">
+                  <span className="chip bg-white/95 text-ink">{latestBlogs[0].category || 'Story'}</span>
+                  <h3 className="font-display text-2xl sm:text-3xl font-bold leading-tight max-w-xl">{latestBlogs[0].title}</h3>
+                  <p className="text-white/80 line-clamp-2 max-w-xl">{stripHtml(latestBlogs[0].content)}</p>
+                  <span className="inline-flex items-center gap-2 text-sm pt-1">
+                    <Avatar name={latestBlogs[0].author?.name} src={latestBlogs[0].author?.profilePicture} size="xs" />
+                    {latestBlogs[0].author?.name}
+                  </span>
+                </div>
+              </Link>
+            </Reveal>
+            <div className="lg:col-span-5 grid gap-6">
+              {latestBlogs.slice(1).map((b, i) => (
+                <Reveal key={b._id} delay={(i + 1) * 90}>
+                  <Link to={`/blogs/${b._id}`} className="group card card-hover flex gap-5 p-4 h-full">
+                    <img src={b.coverImage || IMG.children} alt="" loading="lazy" className="w-28 sm:w-36 aspect-square rounded-2xl object-cover shrink-0" />
+                    <span className="flex flex-col justify-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold text-brand uppercase tracking-wider">{b.category || 'Story'}</span>
+                      <span className="font-display text-lg font-semibold text-ink leading-snug line-clamp-2 group-hover:text-brand transition-colors">{b.title}</span>
+                      <span className="text-sm text-muted line-clamp-2">{stripHtml(b.content)}</span>
+                    </span>
+                  </Link>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============ EVENTS ============ */}
+      {upcomingEvents.length > 0 && (
+        <section className="bg-paper-deep/60 border-y border-sand">
+          <div className="container-page py-20 lg:py-24">
+            <SectionHeader
+              eyebrow="आगामी कार्यक्रम"
+              title="Show up, meet your neighbours"
+              action={<ViewAll to="/events">All events</ViewAll>}
+            />
+            <div className="grid gap-4">
+              {upcomingEvents.map((ev, i) => {
+                const d = new Date(ev.date);
+                const capacity = ev.maxParticipants ? `${ev.joinedUsers?.length || 0} / ${ev.maxParticipants} going` : `${ev.joinedUsers?.length || 0} going`;
+                return (
+                  <Reveal key={ev._id} delay={i * 80}>
+                    <Link to={`/events/${ev._id}`} className="group card card-hover flex flex-col sm:flex-row sm:items-center gap-5 p-5">
+                      <span className="w-20 shrink-0 rounded-2xl bg-white border border-sand text-center py-2.5">
+                        <span className="block text-xs font-bold uppercase tracking-wider text-brand">{d.toLocaleDateString('en-GB', { month: 'short' })}</span>
+                        <span className="block font-display text-3xl font-bold text-ink leading-none mt-1">{d.getDate()}</span>
+                      </span>
+                      <span className="flex-1 min-w-0 space-y-1.5">
+                        {ev.category && <span className="chip bg-sky-tint text-sky-ink">{ev.category}</span>}
+                        <span className="block font-display text-xl font-semibold text-ink group-hover:text-brand transition-colors">{ev.title}</span>
+                        <span className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+                          {ev.location && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPin className="w-4 h-4" aria-hidden="true" /> {ev.location}
+                            </span>
+                          )}
+                          {ev.startTime && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock className="w-4 h-4" aria-hidden="true" /> {ev.startTime}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-4 shrink-0">
+                        <span className="text-sm text-muted">{capacity}</span>
+                        <span className="btn btn-primary btn-sm">View & join</span>
+                      </span>
+                    </Link>
+                  </Reveal>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============ ORGANISATIONS + TRUST ============ */}
+      <section className="container-page py-20 lg:py-28">
+        <div className="grid lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-5">
+            <SectionHeader
+              eyebrow="विश्वासमा आधारित"
+              title="Built on trust, not on hope"
+              intro="Helping is easier when you know who you're working with. These safeguards are part of every request, campaign and profile."
+            />
+            <ul className="space-y-5">
+              {[
+                { icon: ShieldCheck, title: 'Moderated before it goes live', body: 'Every help request and story is reviewed by a moderator first.' },
+                { icon: BadgeCheck, title: 'Verified organisations', body: 'NGOs and groups are checked by the Hateymalo team before they get a verified badge.' },
+                { icon: ReceiptText, title: 'Open expense ledgers', body: 'Campaigns publish what was spent and on what, for anyone to read.' },
+                { icon: Flag, title: 'Report anything that feels wrong', body: 'Any post, comment or profile can be reported and is looked at by our team.' },
+              ].map((t, i) => (
+                <Reveal as="li" key={t.title} delay={i * 70} className="flex gap-4">
+                  <span className="w-11 h-11 rounded-xl bg-pine-tint text-pine flex items-center justify-center shrink-0">
+                    <t.icon className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-ink">{t.title}</span>
+                    <span className="block text-sm text-muted leading-relaxed">{t.body}</span>
+                  </span>
+                </Reveal>
+              ))}
+            </ul>
+          </div>
+
+          <div className="lg:col-span-7">
+            <Reveal className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-2xl font-bold text-ink flex items-center gap-2">
+                <Building2 className="w-6 h-6 text-pine" aria-hidden="true" /> Organisations on Hateymalo
+              </h3>
+              <ViewAll to="/organizations">Directory</ViewAll>
+            </Reveal>
+            {organizations.length > 0 ? (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {organizations.map((org, i) => (
+                  <Reveal key={org._id} delay={i * 80}>
+                    <Link to={`/profile/${org._id}`} className="group card card-hover p-5 flex flex-col gap-3 h-full">
+                      <span className="flex items-center gap-3">
+                        <Avatar name={org.orgDetails?.orgName || org.name} src={org.profilePicture} size="lg" rounded="rounded-2xl" />
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-ink truncate group-hover:text-brand transition-colors">
+                            {org.orgDetails?.orgName || org.name}
+                          </span>
+                          <span className="block text-xs text-muted">{org.orgDetails?.orgType || 'Organisation'}</span>
+                        </span>
+                      </span>
+                      {(org.orgDetails?.description || org.bio) && (
+                        <span className="text-sm text-muted line-clamp-2">{org.orgDetails?.description || org.bio}</span>
+                      )}
+                      <span className="mt-auto flex items-center justify-between text-xs text-muted">
+                        {org.location && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> {org.location}
+                          </span>
+                        )}
+                        {org.isVerified && <VerificationBadge level="ORGANIZATION" isVerified />}
+                      </span>
+                    </Link>
+                  </Reveal>
+                ))}
+                <Reveal delay={organizations.length * 80}>
+                  <Link to="/register" className="group h-full min-h-[10rem] rounded-[var(--radius-card)] border-2 border-dashed border-sand hover:border-pine p-5 flex flex-col items-center justify-center text-center gap-2 transition-colors">
+                    <Plus className="w-6 h-6 text-pine" aria-hidden="true" />
+                    <span className="font-semibold text-ink">Run an NGO or community group?</span>
+                    <span className="text-sm text-muted">Register your organisation — it's free.</span>
+                  </Link>
+                </Reveal>
+              </div>
+            ) : (
+              <div className="card p-10 text-center space-y-3">
+                <p className="text-ink font-semibold">No organisations have joined yet.</p>
+                <Link to="/register" className="btn btn-pine btn-sm">Register your organisation</Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ FAQ ============ */}
+      <section className="container-page pb-20 lg:pb-28">
+        <div className="max-w-3xl mx-auto">
+          <SectionHeader eyebrow="प्रश्न र उत्तर" title="Questions people often ask" />
+          <div className="divide-y divide-sand border-y border-sand">
+            {faqs.map((item, idx) => {
+              const open = activeFaq === idx;
+              return (
+                <div key={item.q}>
+                  <h3 className="font-sans">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFaq(open ? -1 : idx)}
+                      aria-expanded={open}
+                      aria-controls={`faq-${idx}`}
+                      className="w-full py-5 flex items-center justify-between gap-6 text-left text-lg font-semibold text-ink hover:text-brand transition-colors"
+                    >
+                      {item.q}
+                      <span className={`w-9 h-9 rounded-full border border-sand flex items-center justify-center shrink-0 transition-colors ${open ? 'bg-ink text-white border-ink' : ''}`}>
+                        {open ? <Minus className="w-4 h-4" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
+                      </span>
+                    </button>
+                  </h3>
+                  <div
+                    id={`faq-${idx}`}
+                    className={`grid transition-[grid-template-rows] duration-500 ease-[var(--ease-out-soft)] ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+                  >
+                    <div className="overflow-hidden">
+                      <p className="pb-6 pr-12 text-muted leading-relaxed">{item.a}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

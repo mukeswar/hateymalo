@@ -9,7 +9,7 @@ const {
   toggleFeaturedBlog,
   deleteBlog,
 } = require('../controllers/blogController');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, requirePermission } = require('../middleware/auth');
 
 router.route('/')
   .get(getPublicBlogs)
@@ -17,8 +17,8 @@ router.route('/')
 
 router.get('/:id', getBlogById);
 router.post('/:id/react', protect, toggleBlogReaction);
-router.put('/:id/status', protect, adminOnly, updateBlogStatus);
-router.put('/:id/feature', protect, adminOnly, toggleFeaturedBlog);
+router.put('/:id/status', protect, requirePermission('canApprovePosts'), updateBlogStatus);
+router.put('/:id/feature', protect, requirePermission('canApprovePosts'), toggleFeaturedBlog);
 router.delete('/:id', protect, deleteBlog);
 
 module.exports = router;

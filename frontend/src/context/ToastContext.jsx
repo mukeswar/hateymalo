@@ -1,13 +1,26 @@
-import React, { createContext, useContext, useState } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import React, { createContext, useContext, useRef, useState } from 'react';
+import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const ToastContext = createContext();
 
+const STYLES = {
+  success: { accent: 'bg-pine', icon: CheckCircle2, iconClass: 'text-pine bg-pine-tint' },
+  error: { accent: 'bg-brand', icon: AlertCircle, iconClass: 'text-brand bg-brand-tint' },
+  warning: { accent: 'bg-marigold', icon: AlertTriangle, iconClass: 'text-marigold-text bg-marigold-tint' },
+  info: { accent: 'bg-sky-ink', icon: Info, iconClass: 'text-sky-ink bg-sky-tint' },
+};
+
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const seq = useRef(0);
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const showToast = (message, type = 'info') => {
-    const id = Date.now();
+    // Counter suffix keeps ids unique when two toasts fire in the same millisecond.
+    const id = `${Date.now()}-${seq.current++}`;
     setToasts((prev) => [...prev, { id, message, type }]);
 
     setTimeout(() => {
@@ -15,40 +28,39 @@ export const ToastProvider = ({ children }) => {
     }, 4000);
   };
 
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {/* Toast Notification Container */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl backdrop-blur-md border transition-all duration-300 transform translate-y-0 ${
-              toast.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-100'
-                : toast.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/50 text-rose-100'
-                : 'bg-sky-950/90 border-sky-500/50 text-sky-100'
-            }`}
-          >
-            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />}
-            {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />}
-            {toast.type === 'info' && <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />}
-            
-            <p className="text-sm font-medium leading-relaxed flex-grow">{toast.message}</p>
-            
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white transition-colors"
+      <div
+        className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-[70] flex flex-col gap-3 sm:w-full sm:max-w-sm pointer-events-none"
+        aria-live="polite"
+        aria-atomic="false"
+      >
+        {toasts.map((toast) => {
+          const s = STYLES[toast.type] || STYLES.info;
+          const Icon = s.icon;
+          return (
+            <div
+              key={toast.id}
+              role={toast.type === 'error' ? 'alert' : 'status'}
+              className="pointer-events-auto relative overflow-hidden flex items-start gap-3 pl-5 pr-3 py-3.5 bg-white border border-sand rounded-2xl shadow-[var(--shadow-lift)] animate-in animate-rise"
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+              <span className={`absolute left-0 inset-y-0 w-1.5 ${s.accent}`} aria-hidden="true" />
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${s.iconClass}`}>
+                <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
+              </span>
+              <p className="text-sm font-medium text-ink leading-relaxed flex-grow pt-1">{toast.message}</p>
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="w-8 h-8 -mr-1 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-paper-deep transition-colors shrink-0"
+                aria-label="Dismiss notification"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

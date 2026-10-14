@@ -1,14 +1,56 @@
 @import "tailwindcss";
 
-/* Global readability: enlarge the type scale so the UI's small text reads
-   comfortably, without changing rem-based layout spacing. */
+/* ==========================================================================
+   HATEYMALO design system
+   Warm paper surfaces, ink text, the logo's crimson for action, pine green
+   for trust/verification, marigold for celebration and progress.
+   Eczar (display) + Mukta (UI) — both cover Latin and Devanagari.
+   ========================================================================== */
+
 @theme {
-  --text-xs: 0.82rem;      /* was 0.75rem (12px) -> ~13px */
-  --text-sm: 0.95rem;      /* was 0.875rem (14px) -> ~15px */
-  --text-base: 1.06rem;    /* was 1rem (16px)    -> ~17px */
-  --text-lg: 1.19rem;      /* was 1.125rem (18px)-> ~19px */
-  --text-xl: 1.32rem;      /* was 1.25rem (20px) -> ~21px */
-  --text-2xl: 1.6rem;      /* was 1.5rem (24px)  -> ~26px */
+  /* Type scale (slightly larger than Tailwind's defaults for readability) */
+  --text-xs: 0.82rem;
+  --text-sm: 0.95rem;
+  --text-base: 1.06rem;
+  --text-lg: 1.19rem;
+  --text-xl: 1.32rem;
+  --text-2xl: 1.6rem;
+
+  --font-sans: 'Mukta', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Eczar', 'Mukta', Georgia, serif;
+
+  /* Brand palette — usable as bg-brand, text-ink, border-sand, etc. */
+  --color-paper: #FBF7F0;
+  --color-paper-deep: #F4ECDF;
+  --color-sand: #E8DFD2;
+  --color-ink: #1F1B16;
+  --color-ink-soft: #3A332B;
+  --color-muted: #6B6157;
+
+  --color-brand: #B5232C;
+  --color-brand-dark: #8E1A22;
+  --color-brand-tint: #FBE9E6;
+
+  --color-pine: #1E5A47;
+  --color-pine-dark: #15412F;
+  --color-pine-tint: #E4EFE9;
+
+  --color-marigold: #E9A23B;
+  --color-marigold-text: #8A5A00;
+  --color-marigold-tint: #FCF0DA;
+
+  --color-sky-ink: #2F5D8A;
+  --color-sky-tint: #E6EEF6;
+
+  --color-night: #1A1714;
+
+  --radius-card: 1.25rem;
+
+  --shadow-soft: 0 1px 2px rgb(31 27 22 / 0.04), 0 4px 16px -4px rgb(31 27 22 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(31 27 22 / 0.04), 0 18px 40px -12px rgb(31 27 22 / 0.18);
+  --shadow-brand: 0 10px 28px -10px rgb(181 35 44 / 0.45);
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Raise the floor on the tiniest hardcoded sizes so nothing is unreadable. */
@@ -18,55 +60,295 @@
 
 @layer base {
   :root {
-    --color-primary: #C8382C;
-    --color-primary-hover: #B02E23;
-    --color-primary-light: rgba(200, 56, 44, 0.08);
-    --color-gold: #D97706;
-    --color-gold-light: rgba(217, 119, 6, 0.12);
+    color-scheme: light;
+    /* Kept for older inline styles that reference these names */
+    --color-primary: #B5232C;
+    --color-primary-hover: #8E1A22;
+    --color-primary-light: rgba(181, 35, 44, 0.08);
+    --color-gold: #E9A23B;
+    --color-gold-light: rgba(233, 162, 59, 0.14);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    background-color: #FAFAFA;
-    color: #0F172A;
-    font-family: 'Plus Jakarta Sans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* Devanagari needs extra line-height so matras are not clipped */
+  :lang(ne), .deva {
+    line-height: 1.7;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2.5px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  img {
+    max-width: 100%;
   }
 }
 
-/* Custom Editorial Glass & Card Utilities */
-.editorial-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* ---------- Layout ---------- */
+@utility container-page {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 40rem) { padding-inline: 1.5rem; }
+  @media (width >= 64rem) { padding-inline: 2rem; }
 }
 
-.editorial-card:hover {
-  border-color: rgba(200, 56, 44, 0.35);
-  box-shadow: 0 10px 25px -5px rgba(200, 56, 44, 0.1);
+/* ---------- Buttons ---------- */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.7rem 1.4rem;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: transform 0.25s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft),
+    background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  &:active { transform: translateY(0) scale(0.98); }
+  &:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 }
 
-.terracotta-btn {
-  background-color: #C8382C;
-  color: #FFFFFF;
+@utility btn-primary {
+  background: var(--color-brand);
+  color: #fff;
+  &:hover:not(:disabled) { background: var(--color-brand-dark); box-shadow: var(--shadow-brand); transform: translateY(-1px); }
+}
+
+@utility btn-pine {
+  background: var(--color-pine);
+  color: #fff;
+  &:hover:not(:disabled) { background: var(--color-pine-dark); box-shadow: 0 10px 28px -10px rgb(30 90 71 / 0.5); transform: translateY(-1px); }
+}
+
+@utility btn-ghost {
+  background: #fff;
+  color: var(--color-ink);
+  border: 1px solid var(--color-sand);
+  &:hover:not(:disabled) { border-color: var(--color-ink); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+}
+
+@utility btn-light {
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  backdrop-filter: blur(8px);
+  &:hover:not(:disabled) { background: rgb(255 255 255 / 0.22); }
+}
+
+@utility btn-sm {
+  padding: 0.45rem 0.95rem;
+  font-size: var(--text-xs);
+}
+
+@utility btn-lg {
+  padding: 0.95rem 1.8rem;
+  font-size: var(--text-base);
+}
+
+/* ---------- Surfaces ---------- */
+@utility card {
+  background: #fff;
+  border: 1px solid var(--color-sand);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
+@utility card-hover {
+  transition: transform 0.35s var(--ease-out-soft), box-shadow 0.35s var(--ease-out-soft), border-color 0.25s ease;
+  &:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: #D9CCB9; }
+}
+
+@utility surface-sunken {
+  background: var(--color-paper-deep);
+  border-radius: var(--radius-card);
+}
+
+/* ---------- Chips, labels, form fields ---------- */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  padding: 0.2rem 0.7rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-xs);
   font-weight: 700;
-  transition: all 0.25s ease;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-brand);
 }
 
-.terracotta-btn:hover {
-  background-color: #B02E23;
-  box-shadow: 0 10px 25px -5px rgba(200, 56, 44, 0.3);
-  transform: translateY(-1px);
+@utility field {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--color-sand);
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.95rem;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  &::placeholder { color: #9A8F84; }
+  &:focus { outline: none; border-color: var(--color-brand); box-shadow: 0 0 0 4px rgb(181 35 44 / 0.12); }
 }
 
+@utility field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+/* Letter-spacing breaks the joined headline (shirorekha) of Devanagari words */
+.eyebrow.deva {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--text-sm);
+}
+
+/* ---------- Progress (donations, capacity) ---------- */
+@utility progress-track {
+  height: 0.55rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--color-paper-deep);
+}
+
+@utility progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--color-marigold), #F2B85E);
+  transition: width 1.2s var(--ease-out-soft);
+}
+
+/* Paper grain for large hero/closing bands (very light, decorative) */
+@utility grain {
+  background-image: radial-gradient(rgb(31 27 22 / 0.035) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+/* ---------- Motion primitives (see components/ui/motion.jsx) ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s var(--ease-out-soft), transform 0.8s var(--ease-out-soft);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.tilt {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  --glare-x: 50%;
+  --glare-y: 50%;
+  position: relative;
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transform-style: preserve-3d;
+  transition: transform 0.45s var(--ease-out-soft), box-shadow 0.35s var(--ease-out-soft);
+  will-change: transform;
+}
+.tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--glare-x) var(--glare-y), rgb(255 255 255 / 0.22), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.tilt:hover::after {
+  opacity: 1;
+}
+
+/* Used across pages for entry animations (replaces the missing tailwindcss-animate plugin) */
+@keyframes hm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes hm-pop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes hm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+.animate-in { animation: hm-fade-in 0.3s ease both; }
+.animate-in.slide-in-from-bottom-2, .animate-rise { animation-name: hm-rise; animation-duration: 0.45s; animation-timing-function: var(--ease-out-soft); }
+.animate-in.zoom-in-95, .animate-pop { animation-name: hm-pop; animation-duration: 0.25s; }
+.animate-float { animation: hm-float 6s ease-in-out infinite; }
+
+/* Legacy class names still used by a few pages, mapped onto the new system */
+.editorial-card {
+  background: #fff;
+  border: 1px solid var(--color-sand);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow 0.3s var(--ease-out-soft), border-color 0.3s ease;
+}
+.editorial-card:hover { border-color: #D9CCB9; box-shadow: var(--shadow-lift); }
+.terracotta-btn {
+  background-color: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 0.2s ease, box-shadow 0.25s ease, transform 0.25s var(--ease-out-soft);
+}
+.terracotta-btn:hover { background-color: var(--color-brand-dark); box-shadow: var(--shadow-brand); transform: translateY(-1px); }
 .terracotta-badge {
-  background-color: rgba(200, 56, 44, 0.1);
-  color: #C8382C;
-  border: 1px solid rgba(200, 56, 44, 0.25);
+  background-color: var(--color-brand-tint);
+  color: var(--color-brand);
+  border: 1px solid rgb(181 35 44 / 0.2);
 }
+.text-gradient-terracotta { color: var(--color-brand); }
 
-.text-gradient-terracotta {
-  background: linear-gradient(135deg, #94201B 0%, #C8382C 50%, #D97706 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* Respect reduced-motion everywhere */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  .tilt { transform: none !important; }
 }

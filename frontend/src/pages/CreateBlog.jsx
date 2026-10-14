@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import API from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { BookOpen, ShieldAlert, Image, FileText, Send } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ImageIcon, Send, PenLine, Lightbulb } from 'lucide-react';
 
 const BLOG_CATEGORIES = [
   'Community Story',
@@ -13,6 +13,8 @@ const BLOG_CATEGORIES = [
   'Personal Reflection',
 ];
 
+const isHttpUrl = (s) => /^https?:\/\/\S+$/i.test(s);
+
 const CreateBlog = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -22,6 +24,7 @@ const CreateBlog = () => {
   const [coverImage, setCoverImage] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,111 +53,149 @@ const CreateBlog = () => {
     }
   };
 
+  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const showPreview = isHttpUrl(coverImage) && !previewFailed;
+
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 text-xs font-bold text-teal-700 uppercase tracking-widest">
-          <BookOpen className="w-4 h-4" /> Share Community Voices
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Write & Submit Blog Story</h1>
-        <p className="text-sm text-slate-600">
-          Share your volunteer journey, community reflection, or environmental campaign insights.
-        </p>
-      </div>
+    <div className="container-page pt-6 sm:pt-8 pb-20">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <Link
+          to="/blogs"
+          className="inline-flex items-center gap-2 min-h-10 text-sm font-semibold text-ink-soft hover:text-brand transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> All stories
+        </Link>
 
-      {/* Approval Banner */}
-      <div className="p-5 rounded-2xl border border-sky-300 bg-sky-50 flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-sky-700 shrink-0 mt-0.5" />
-        <div className="text-xs sm:text-sm text-sky-900 leading-relaxed">
-          <strong className="font-bold text-sky-900">Approval Workflow: </strong>
-          Submitted blog stories are set to <span className="underline font-semibold">PENDING</span> status and reviewed by an administrator before appearing publicly in the blog directory.
-        </div>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-3xl space-y-6 border border-slate-200 shadow-md">
-        
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-            Blog Title <span className="text-teal-600">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., What 5 Weeks of Bagmati Cleaning Taught Me About Community Unity"
-            className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 rounded-2xl p-4 text-sm text-slate-900 outline-none"
-          />
+        {/* Header */}
+        <div className="space-y-3 animate-rise">
+          <span className="eyebrow">
+            <PenLine className="w-4 h-4" aria-hidden="true" /> Write a story · <span className="deva normal-case tracking-normal">कथा लेख्नुहोस्</span>
+          </span>
+          <h1 className="text-4xl sm:text-5xl font-bold text-ink leading-[1.08]">Tell us what happened</h1>
+          <p className="text-muted text-lg leading-relaxed">
+            A volunteer day, a neighbour who helped, a lesson from the field — write it the way you'd tell a friend.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Review note */}
+        <div className="flex items-start gap-3 rounded-[var(--radius-card)] bg-sky-tint p-4 sm:p-5">
+          <ShieldCheck className="w-5 h-5 text-sky-ink shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-sm text-ink-soft leading-relaxed">
+            <strong className="font-semibold text-sky-ink">Reviewed before publishing. </strong>
+            New stories are saved as <span className="font-semibold">pending</span> and appear in Stories once an administrator approves them.
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="card p-6 sm:p-8 space-y-6">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Category
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 rounded-2xl p-4 text-sm text-slate-900 outline-none cursor-pointer"
-            >
-              {BLOG_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Image className="w-3.5 h-3.5 text-teal-600" /> Cover Image URL (Optional)
+            <label htmlFor="blog-title" className="field-label">
+              Title <span className="text-brand" aria-hidden="true">*</span>
             </label>
             <input
-              type="url"
-              value={coverImage}
-              onChange={(e) => setCoverImage(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 rounded-2xl p-4 text-sm text-slate-900 outline-none"
+              id="blog-title"
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. What five weeks of cleaning the Bagmati taught me"
+              className="field !text-lg font-display"
             />
           </div>
-        </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-            <FileText className="w-3.5 h-3.5 text-teal-600" /> Full Story Content <span className="text-teal-600">*</span>
-          </label>
-          <textarea
-            required
-            rows={10}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Write your story here in detail..."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 rounded-2xl p-4 text-sm text-slate-900 outline-none"
-          />
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="blog-category" className="field-label">
+                Category
+              </label>
+              <select
+                id="blog-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="field cursor-pointer"
+              >
+                {BLOG_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="flex justify-end gap-4 pt-2">
-          <button
-            type="button"
-            onClick={() => navigate('/blogs')}
-            className="px-6 py-3.5 rounded-2xl text-sm font-semibold text-slate-600 bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-8 py-3.5 rounded-2xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <Send className="w-4 h-4" /> {loading ? 'Submitting...' : 'Submit Story for Review'}
-          </button>
-        </div>
+            <div>
+              <label htmlFor="blog-cover" className="field-label">
+                Cover image link <span className="font-normal text-muted">(optional)</span>
+              </label>
+              <input
+                id="blog-cover"
+                type="url"
+                value={coverImage}
+                onChange={(e) => {
+                  setCoverImage(e.target.value);
+                  setPreviewFailed(false);
+                }}
+                placeholder="https://…"
+                aria-describedby="blog-cover-hint"
+                className="field"
+              />
+              <p id="blog-cover-hint" className="mt-1.5 text-sm text-muted">
+                Paste a link to a photo you have the right to share.
+              </p>
+            </div>
+          </div>
 
-      </form>
+          {/* Cover preview */}
+          <div className="overflow-hidden rounded-2xl border border-dashed border-sand bg-paper aspect-[16/7] flex items-center justify-center">
+            {showPreview ? (
+              <img
+                src={coverImage}
+                alt="Cover image preview"
+                onError={() => setPreviewFailed(true)}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="flex flex-col items-center gap-2 text-sm text-muted px-4 text-center">
+                <ImageIcon className="w-6 h-6" aria-hidden="true" />
+                {previewFailed ? "We couldn't load that image — check the link." : 'Your cover image preview will appear here'}
+              </span>
+            )}
+          </div>
 
+          <div>
+            <div className="flex items-end justify-between gap-3">
+              <label htmlFor="blog-content" className="field-label">
+                Your story <span className="text-brand" aria-hidden="true">*</span>
+              </label>
+              <span className="mb-1.5 text-xs text-muted tabular-nums" aria-live="polite">
+                {words} {words === 1 ? 'word' : 'words'}
+              </span>
+            </div>
+            <textarea
+              id="blog-content"
+              required
+              rows={14}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Start with the moment it began…"
+              aria-describedby="blog-content-hint"
+              className="field !text-base leading-relaxed resize-y min-h-[16rem]"
+            />
+            <p id="blog-content-hint" className="mt-2 flex items-start gap-2 text-sm text-muted">
+              <Lightbulb className="w-4 h-4 shrink-0 mt-0.5 text-marigold-text" aria-hidden="true" />
+              Leave a blank line between paragraphs. Please don't share private details like phone numbers or home addresses.
+            </p>
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-sand">
+            <button type="button" onClick={() => navigate('/blogs')} className="btn btn-ghost">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading} className="btn btn-primary">
+              <Send className="w-4 h-4" aria-hidden="true" /> {loading ? 'Submitting…' : 'Submit for review'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

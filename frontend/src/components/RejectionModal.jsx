@@ -1,8 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 
 const RejectionModal = ({ isOpen, onClose, onConfirm, postTitle }) => {
   const [reason, setReason] = useState('');
+  const textareaRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Close on Escape and focus the reason field when opened
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCloseRef.current?.();
+    };
+    document.addEventListener('keydown', onKey);
+    const t = setTimeout(() => textareaRef.current?.focus(), 30);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      clearTimeout(t);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -13,64 +30,74 @@ const RejectionModal = ({ isOpen, onClose, onConfirm, postTitle }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-rose-500/30">
-        
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rejection-modal-title"
+        aria-describedby="rejection-modal-desc"
+        className="card !rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-[var(--shadow-lift)] animate-pop max-h-[calc(100vh-2rem)] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between gap-3 pb-4 border-b border-sand">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
-              <AlertTriangle className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Reject Post</h3>
-              <p className="text-xs text-slate-400">Provide feedback to the author</p>
+              <h3 id="rejection-modal-title" className="text-xl font-bold text-ink leading-tight">
+                Reject post
+              </h3>
+              <p id="rejection-modal-desc" className="text-sm text-muted">
+                Your feedback is sent to the author so they can improve it.
+              </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-1"
+            aria-label="Close"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-paper-deep transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Post Title:
-            </label>
-            <p className="text-sm font-medium text-slate-200 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-              "{postTitle}"
+            <p className="field-label">Post title</p>
+            <p className="text-sm font-medium text-ink surface-sunken !rounded-xl p-3 break-words">
+              &ldquo;{postTitle}&rdquo;
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Rejection Reason <span className="text-rose-400">*</span>
+            <label htmlFor="rejection-reason" className="field-label">
+              Rejection reason <span className="text-brand">*</span>
             </label>
             <textarea
+              id="rejection-reason"
+              ref={textareaRef}
               required
               rows={4}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g., Please provide more details regarding safety measures, or this content contains commercial advertisement."
-              className="w-full bg-slate-900 border border-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 outline-none"
+              className="field"
             />
+            <p className="text-xs text-muted mt-1">Be specific and kind — the author will read this.</p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
-            >
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-4 border-t border-sand">
+            <button type="button" onClick={onClose} className="btn btn-ghost">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl text-sm font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition-all"
-            >
-              Confirm Rejection
+            <button type="submit" className="btn btn-primary">
+              Confirm rejection
             </button>
           </div>
         </form>

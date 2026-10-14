@@ -1,6 +1,7 @@
 const Blog = require('../models/Blog');
 const Notification = require('../models/Notification');
 const { isStaff } = require('../utils/roles');
+const { hasPermission } = require('../utils/permissions');
 const { getSettings } = require('../utils/settingsCache');
 
 // @desc    Submit new blog story
@@ -218,7 +219,7 @@ const deleteBlog = async (req, res) => {
     }
 
     const isAuthor = blog.author.toString() === req.user._id.toString();
-    const isAdmin = isStaff(req.user);
+    const isAdmin = hasPermission(req.user, 'canDeletePosts');
 
     if (!isAuthor && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this blog' });

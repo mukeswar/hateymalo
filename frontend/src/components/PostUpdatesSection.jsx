@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Megaphone, Plus, Clock, Send } from 'lucide-react';
+import Avatar from './ui/Avatar';
+import { Megaphone, Plus, X, Send } from 'lucide-react';
+
+const formatStamp = (d) => {
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · ${date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+};
 
 const PostUpdatesSection = ({ postId, isCreator }) => {
   const { user } = useAuth();
@@ -54,92 +64,82 @@ const PostUpdatesSection = ({ postId, isCreator }) => {
   };
 
   return (
-    <div className="bg-amber-50/70 p-6 sm:p-8 rounded-3xl space-y-6 border border-amber-200 shadow-md">
-      
-      <div className="flex items-center justify-between border-b border-amber-200 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center border border-amber-300">
-            <Megaphone className="w-5 h-5" />
-          </div>
+    <section className="card p-6 sm:p-8 space-y-6" aria-labelledby="updates-title">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="w-11 h-11 rounded-2xl bg-marigold-tint text-marigold-text flex items-center justify-center shrink-0">
+            <Megaphone className="w-5 h-5" aria-hidden="true" />
+          </span>
           <div>
-            <h3 className="text-lg font-extrabold text-slate-900">Campaign Updates & Announcements</h3>
-            <p className="text-xs text-amber-800">Direct notices from the campaign organizer</p>
+            <h2 id="updates-title" className="text-2xl font-semibold text-ink">Updates from the organiser</h2>
+            <p className="text-sm text-muted">News, changes of plan and progress on this request.</p>
           </div>
         </div>
 
         {isCreator && (
           <button
+            type="button"
             onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-md transition-all flex items-center gap-1.5"
+            aria-expanded={showForm}
+            className={`btn btn-sm ${showForm ? 'btn-ghost' : 'btn-primary'}`}
           >
-            <Plus className="w-4 h-4" /> {showForm ? 'Cancel' : 'Post Update'}
+            {showForm ? <X className="w-4 h-4" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
+            {showForm ? 'Cancel' : 'Post update'}
           </button>
         )}
       </div>
 
-      {/* Organizer Create Update Form */}
+      {/* Organiser: create update */}
       {isCreator && showForm && (
-        <form onSubmit={handleSubmitUpdate} className="p-4 rounded-2xl bg-white border border-amber-300 space-y-3 animate-in fade-in duration-200">
-          <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider">
-            Broadcast Announcement to Interested & Joined Volunteers
+        <form onSubmit={handleSubmitUpdate} className="surface-sunken p-4 sm:p-5 space-y-3 animate-rise">
+          <label htmlFor={`update-${postId}`} className="field-label">
+            Share an update with everyone who joined or is interested
           </label>
           <textarea
+            id={`update-${postId}`}
             required
             rows={3}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="e.g. The meeting point has moved to Patan Gate, start time is 7:30 AM sharp."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-amber-500 rounded-xl p-3 text-sm text-slate-900 outline-none"
+            placeholder="e.g. The meeting point has moved to Patan Gate; we start at 7:30 AM."
+            className="field leading-relaxed"
           />
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2.5 rounded-xl font-bold bg-amber-600 text-white shadow-md text-xs flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" /> Broadcast Update
+            <button type="submit" disabled={submitting} className="btn btn-primary btn-sm">
+              <Send className="w-4 h-4" aria-hidden="true" /> {submitting ? 'Posting…' : 'Post update'}
             </button>
           </div>
         </form>
       )}
 
-      {/* Updates Timeline */}
+      {/* Updates timeline */}
       {loading ? (
-        <div className="h-16 bg-slate-200 animate-pulse rounded-2xl" />
+        <div className="h-16 bg-paper-deep animate-pulse rounded-2xl" aria-hidden="true" />
       ) : updates.length > 0 ? (
-        <div className="space-y-4">
+        <ol className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-sand">
           {updates.map((up) => (
-            <div
-              key={up._id}
-              className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 relative shadow-xs"
-            >
-              <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={up.author?.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-                    alt={up.author?.name}
-                    className="w-6 h-6 rounded-lg object-cover"
-                  />
-                  <span className="font-bold text-slate-900">{up.author?.name}</span>
-                </div>
-                <span className="flex items-center gap-1 text-[11px] text-amber-800">
-                  <Clock className="w-3 h-3" />
-                  {new Date(up.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(up.createdAt).toLocaleDateString()}
-                </span>
+            <li key={up._id} className="relative pl-10">
+              <span
+                className="absolute left-0 top-1.5 w-6 h-6 rounded-full bg-white border-2 border-marigold flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <span className="w-2 h-2 rounded-full bg-marigold" />
+              </span>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <Avatar name={up.author?.name || 'Organiser'} src={up.author?.profilePicture} size="xs" />
+                <span className="font-semibold text-ink">{up.author?.name}</span>
+                <time dateTime={up.createdAt} className="text-muted">{formatStamp(up.createdAt)}</time>
               </div>
-              <p className="text-sm text-slate-900 leading-relaxed font-medium pt-1">
-                {up.content}
-              </p>
-            </div>
+              <p className="mt-2 text-ink-soft leading-relaxed whitespace-pre-line break-words">{up.content}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       ) : (
-        <p className="text-xs text-slate-500 italic text-center py-4">
-          No campaign updates published yet.
+        <p className="text-muted">
+          {isCreator ? 'No updates yet. Post one to keep your helpers in the loop.' : 'No updates yet — the organiser will post news here.'}
         </p>
       )}
-
-    </div>
+    </section>
   );
 };
 

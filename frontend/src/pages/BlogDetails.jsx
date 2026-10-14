@@ -4,16 +4,14 @@ import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import CommentSection from '../components/CommentSection';
-import {
-  BookOpen,
-  Eye,
-  Heart,
-  Share2,
-  Calendar,
-  User,
-  ArrowLeft,
-  Check,
-} from 'lucide-react';
+import Avatar from '../components/ui/Avatar';
+import { Reveal } from '../components/ui/motion';
+import { BookOpen, Eye, Heart, Share2, ArrowLeft, Check, PenLine } from 'lucide-react';
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1600&q=70';
+
+const readMinutes = (s = '') =>
+  Math.max(1, Math.round(s.replace(/<[^>]*>?/gm, ' ').split(/\s+/).filter(Boolean).length / 200));
 
 const BlogDetails = () => {
   const { id } = useParams();
@@ -45,25 +43,40 @@ const BlogDetails = () => {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-600"></div>
+      <div className="container-page pt-8 pb-20" aria-busy="true" aria-label="Loading story">
+        <div className="max-w-[68ch] mx-auto space-y-4">
+          <div className="h-5 w-32 bg-paper-deep animate-pulse rounded-full" />
+          <div className="h-12 w-full bg-paper-deep animate-pulse rounded-2xl" />
+          <div className="h-12 w-3/4 bg-paper-deep animate-pulse rounded-2xl" />
+        </div>
+        <div className="mt-8 max-w-5xl mx-auto h-72 sm:h-[28rem] bg-paper-deep animate-pulse rounded-[var(--radius-card)]" />
       </div>
     );
   }
 
   if (!blog) {
     return (
-      <div className="max-w-md mx-auto my-20 p-8 bg-white border border-slate-200 shadow-md rounded-3xl text-center space-y-4">
-        <h2 className="text-xl font-bold text-slate-900">Blog Story Not Found</h2>
-        <Link to="/blogs" className="inline-block px-5 py-2.5 rounded-xl font-bold bg-teal-600 text-white text-xs">
-          Back to Blogs
-        </Link>
+      <div className="container-page py-20">
+        <div className="card max-w-md mx-auto p-10 text-center space-y-4">
+          <span className="mx-auto w-14 h-14 rounded-full bg-paper-deep flex items-center justify-center">
+            <BookOpen className="w-6 h-6 text-muted" aria-hidden="true" />
+          </span>
+          <h1 className="text-2xl font-bold text-ink">We couldn't find this story</h1>
+          <p className="text-muted">It may have been removed or is still waiting for review.</p>
+          <Link to="/blogs" className="btn btn-primary">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to stories
+          </Link>
+        </div>
       </div>
     );
   }
 
   const { title, content, coverImage, category, author, reactions = [], views, createdAt } = blog;
   const hasReacted = user && reactions.some((r) => r._id === user._id || r === user._id);
+  const published = new Date(createdAt);
+  const publishedLabel = Number.isNaN(published.getTime())
+    ? ''
+    : published.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const handleReactToggle = async () => {
     if (!user) {
@@ -93,112 +106,103 @@ const BlogDetails = () => {
     setTimeout(() => setCopied(false), 3000);
   };
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* Back Link */}
+  const renderActions = (className = "") => (
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <button
-        onClick={() => navigate('/blogs')}
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+        type="button"
+        onClick={handleReactToggle}
+        disabled={actionLoading}
+        aria-pressed={!!hasReacted}
+        className={`btn btn-sm min-h-10 ${hasReacted ? 'bg-brand text-white hover:bg-brand-dark' : 'btn-ghost'}`}
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Community Stories
+        <Heart className={`w-4 h-4 ${hasReacted ? 'fill-white' : 'text-brand'}`} aria-hidden="true" />
+        {reactions.length} {reactions.length === 1 ? 'Reaction' : 'Reactions'}
       </button>
-
-      {/* Cover Image */}
-      <div className="rounded-3xl overflow-hidden bg-white border border-slate-200 h-80 sm:h-96 relative shadow-md">
-        <img
-          src={coverImage || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1200&q=80'}
-          alt={title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute top-4 left-4">
-          <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/90 text-slate-900 shadow">
-            {category}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Content Card */}
-      <div className="bg-white rounded-3xl p-6 sm:p-10 space-y-8 border border-slate-200 shadow-md">
-        
-        {/* Header Metadata */}
-        <div className="space-y-4 border-b border-slate-100 pb-6">
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
-            {title}
-          </h1>
-
-          <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
-            {author && (
-              <div className="flex items-center gap-3">
-                <img
-                  src={author.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-                  alt={author.name}
-                  className="w-10 h-10 rounded-xl object-cover border border-slate-200"
-                />
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">{author.name}</p>
-                  <p className="text-[11px] text-slate-500">Published on {new Date(createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 text-slate-600">
-                <Eye className="w-4 h-4 text-teal-700" /> {views} views
-              </span>
-
-              {/* Reaction Button */}
-              <button
-                onClick={handleReactToggle}
-                disabled={actionLoading}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                  hasReacted
-                    ? 'bg-rose-600 text-white border-rose-500 shadow-md'
-                    : 'bg-slate-100 text-rose-600 border-rose-200 hover:bg-rose-600 hover:text-white'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${hasReacted ? 'fill-white' : 'fill-rose-600'}`} />
-                <span>{reactions.length} Reactions</span>
-              </button>
-
-              {/* Share Button */}
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition-colors"
-              >
-                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-                <span>{copied ? 'Copied' : 'Share'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Story Text */}
-        <div className="prose max-w-none text-slate-800 text-base sm:text-lg leading-relaxed space-y-4 whitespace-pre-line">
-          {content}
-        </div>
-
-        {/* Author Footer Card */}
-        {author && (
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-4">
-            <img
-              src={author.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-              alt={author.name}
-              className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
-            />
-            <div>
-              <h4 className="font-bold text-slate-900 text-sm">Written by {author.name}</h4>
-              <p className="text-xs text-slate-500 mt-0.5">{author.bio || 'Community contributor on HAATEMALO.'}</p>
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* Discussion Comments */}
-      <CommentSection postId={id} />
-
+      <button type="button" onClick={handleShare} className="btn btn-sm btn-ghost min-h-10">
+        {copied ? <Check className="w-4 h-4 text-pine" aria-hidden="true" /> : <Share2 className="w-4 h-4" aria-hidden="true" />}
+        {copied ? 'Link copied' : 'Share'}
+      </button>
     </div>
+  );
+
+  return (
+    <article className="pb-20">
+      {/* Title block */}
+      <header className="container-page pt-6 sm:pt-8">
+        <div className="max-w-[68ch] mx-auto space-y-6 animate-rise">
+          <button
+            type="button"
+            onClick={() => navigate('/blogs')}
+            className="inline-flex items-center gap-2 min-h-10 text-sm font-semibold text-ink-soft hover:text-brand transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> All stories
+          </button>
+
+          <div className="space-y-4">
+            {category && <span className="eyebrow">{category}</span>}
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-bold text-ink leading-[1.08]">{title}</h1>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-sand">
+            <div className="flex items-center gap-3 min-w-0">
+              {author && <Avatar name={author.name} src={author.profilePicture} size="md" />}
+              <div className="min-w-0">
+                <p className="font-semibold text-ink truncate">{author?.name || 'Community member'}</p>
+                <p className="text-sm text-muted">
+                  {publishedLabel && <>{publishedLabel} · </>}
+                  {readMinutes(content)} min read ·{' '}
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="w-3.5 h-3.5" aria-hidden="true" /> {views} views
+                  </span>
+                </p>
+              </div>
+            </div>
+            {renderActions()}
+          </div>
+        </div>
+      </header>
+
+      {/* Cover */}
+      <div className="container-page mt-8">
+        <figure className="max-w-5xl mx-auto overflow-hidden rounded-[var(--radius-card)] bg-paper-deep shadow-[var(--shadow-soft)] aspect-[16/9] animate-in">
+          <img src={coverImage || FALLBACK_IMAGE} alt="" className="w-full h-full object-cover" />
+        </figure>
+      </div>
+
+      {/* Story body */}
+      <div className="container-page mt-10 sm:mt-14">
+        <div className="max-w-[68ch] mx-auto">
+          <div className="text-ink-soft text-lg sm:text-[1.22rem] leading-[1.85] whitespace-pre-line break-words first-letter:font-display first-letter:text-6xl first-letter:font-bold first-letter:text-brand first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:leading-[0.85]">
+            {content}
+          </div>
+
+          <div className="mt-12 pt-6 border-t border-sand flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-muted">Did this story move you? Let the author know.</p>
+            {renderActions()}
+          </div>
+
+          {/* Author card */}
+          {author && (
+            <Reveal className="mt-8 surface-sunken p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5">
+              <Avatar name={author.name} src={author.profilePicture} size="lg" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">Written by</p>
+                <p className="font-display text-xl font-bold text-ink">{author.name}</p>
+                <p className="text-sm text-ink-soft mt-1">{author.bio || 'Community contributor on HATEYMALO.'}</p>
+              </div>
+              <Link to="/create-blog" className="btn btn-ghost btn-sm min-h-10 self-start sm:self-center">
+                <PenLine className="w-4 h-4" aria-hidden="true" /> Write your own
+              </Link>
+            </Reveal>
+          )}
+
+          {/* Discussion */}
+          <div className="mt-12">
+            <CommentSection postId={id} />
+          </div>
+        </div>
+      </div>
+    </article>
   );
 };
 

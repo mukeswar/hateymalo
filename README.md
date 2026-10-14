@@ -1,8 +1,8 @@
-# 🇳🇵 हातेमालो (HAATEMALO) - Full-Stack Community Help & Mutual Collaboration Platform
+# 🇳🇵 हातेमालो (HATEYMALO) - Full-Stack Community Help & Mutual Collaboration Platform
 
 Tagline: **"मद्दत मागौँ। सहयोग गरौँ। सँगै परिवर्तन ल्याऔँ।"**
 
-HAATEMALO is a full-stack, non-profit community platform engineered to connect citizens, volunteers, NGOs, schools, and administrators across Nepal for civic mutual aid, emergency assistance, tree plantation campaigns, education tutoring, official assemblies, and voluntary fundraising with 100% financial transparency.
+HATEYMALO is a full-stack, non-profit community platform engineered to connect citizens, volunteers, NGOs, schools, and administrators across Nepal for civic mutual aid, emergency assistance, tree plantation campaigns, education tutoring, official assemblies, and voluntary fundraising with 100% financial transparency.
 
 ---
 
@@ -105,9 +105,9 @@ The Vite dev server will run at: `http://localhost:5173` or `http://localhost:51
 
 | Role | Email | Password | Permissions |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@haatemalo.org` | `admin123` | Moderate posts/blogs, create official events, broadcast announcements, verify member levels, resolve reports |
-| **User (Ram)** | `ram@haatemalo.org` | `user123` | Create posts, write blogs, join events, mark interest, donate |
-| **User (Sita)** | `sita@haatemalo.org` | `user123` | Create posts, write blogs, join events, mark interest, donate |
+| **Admin** | `admin@hateymalo.com` | `admin123` | Moderate posts/blogs, create official events, broadcast announcements, verify member levels, resolve reports |
+| **User (Ram)** | `ram@hateymalo.com` | `user123` | Create posts, write blogs, join events, mark interest, donate |
+| **User (Sita)** | `sita@hateymalo.com` | `user123` | Create posts, write blogs, join events, mark interest, donate |
 
 ---
 

@@ -7,8 +7,9 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-400"></div>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 bg-paper" role="status" aria-live="polite">
+        <span className="w-10 h-10 rounded-full border-[3px] border-sand border-t-brand animate-spin" aria-hidden="true" />
+        <span className="text-sm text-muted">Loading…</span>
       </div>
     );
   }

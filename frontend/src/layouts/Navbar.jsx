@@ -1,363 +1,349 @@
-import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import VerificationBadge from '../components/VerificationBadge';
 import NotificationDropdown from '../components/NotificationDropdown';
+import Avatar from '../components/ui/Avatar';
 import {
-  HeartHandshake,
-  PlusCircle,
+  Plus,
   LayoutDashboard,
+  ShieldCheck,
   ShieldAlert,
   User,
   LogOut,
   Menu,
   X,
-  Compass,
-  Grid,
-  Users,
-  Info,
-  Calendar,
-  BookOpen,
-  Heart,
   Search,
-  Building2,
   ChevronDown,
-  LogIn,
-  UserPlus,
-  Facebook,
-  Youtube,
-  Instagram,
-  Twitter,
+  Heart,
+  Compass,
+  LayoutGrid,
+  CalendarDays,
+  BookOpen,
+  Building2,
+  Users,
 } from 'lucide-react';
+
+export const BrandLockup = ({ compact = false }) => (
+  <span className="flex items-center gap-2.5">
+    <img src="/logo-mark.png" alt="" className="w-10 h-10 sm:w-11 sm:h-11 object-contain" width="44" height="44" />
+    <span className="flex flex-col leading-none">
+      <span className="font-display text-[1.45rem] sm:text-[1.6rem] font-bold text-ink tracking-tight leading-none">
+        हाते<span className="text-brand">मालो</span>
+      </span>
+      {!compact && (
+        <span className="text-[10px] font-semibold tracking-[0.28em] text-muted uppercase mt-1">Hateymalo</span>
+      )}
+    </span>
+  </span>
+);
+
+const NAV_LINKS = [
+  { to: '/explore', label: 'Help Requests', icon: Compass },
+  { to: '/categories', label: 'Causes', icon: LayoutGrid },
+  { to: '/events', label: 'Events', icon: CalendarDays },
+  { to: '/blogs', label: 'Stories', icon: BookOpen },
+  { to: '/organizations', label: 'Organizations', icon: Building2 },
+  { to: '/members', label: 'Members', icon: Users },
+];
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const { settings } = useSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [scrolled, setScrolled] = useState(false);
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const donationsOn = settings?.allowPublicDonations !== false;
+
+  // Close menus on navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setDropdownOpen(false);
+    setSearchOpen(false);
+  }, [location.pathname]);
+
+  // Close the account menu on outside click / Escape
+  useEffect(() => {
+    const onDown = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setDropdownOpen(false);
+        setMobileMenuOpen(false);
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  // Lock page scroll behind the mobile menu
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   const handleLogout = () => {
     logout();
     setDropdownOpen(false);
+    setMobileMenuOpen(false);
     navigate('/');
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      navigate('/search');
-    }
+    const q = searchQuery.trim();
+    navigate(q ? `/search?query=${encodeURIComponent(q)}` : '/search');
+    setSearchOpen(false);
+    setMobileMenuOpen(false);
   };
 
-  const isActive = (path) => location.pathname === path;
+  const linkClass = ({ isActive }) =>
+    `relative px-3 py-2 text-[0.95rem] font-medium transition-colors whitespace-nowrap after:absolute after:left-3 after:right-3 after:-bottom-0.5 after:h-[2px] after:rounded-full after:bg-brand after:origin-left after:transition-transform after:duration-300 ${
+      isActive ? 'text-ink after:scale-x-100' : 'text-muted hover:text-ink after:scale-x-0 hover:after:scale-x-100'
+    }`;
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-xs transition-all duration-300">
-      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-4">
-          
-          {/* BRAND LOGO LOCKUP (LEFT ALIGNED) */}
-          <div className="flex-1 flex items-center justify-start shrink-0">
-            <Link to="/" className="flex items-center group py-1">
-              <img
-                src="/logo.png"
-                alt="हातेमालो (HAATEMALO)"
-                className="h-12 sm:h-14 w-auto object-contain transition-transform group-hover:scale-[1.02]"
-              />
-            </Link>
-          </div>
+    <header
+      className={`sticky top-0 z-50 w-full transition-[background-color,box-shadow,border-color] duration-300 border-b ${
+        scrolled || mobileMenuOpen
+          ? 'bg-paper/90 backdrop-blur-xl border-sand shadow-[0_6px_24px_-16px_rgb(31_27_22/0.35)]'
+          : 'bg-paper/70 backdrop-blur-md border-transparent'
+      }`}
+    >
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 btn btn-primary btn-sm z-[60]">
+        Skip to content
+      </a>
+      <div className="container-page">
+        <div className="flex items-center justify-between h-16 sm:h-[72px] gap-4">
+          <Link to="/" className="shrink-0 rounded-xl" aria-label="Hateymalo home">
+            <BrandLockup />
+          </Link>
 
-          {/* DESKTOP SEGMENTED PILL NAV BAR (DEAD-CENTERED IN VIEWPORT) */}
-          <div className="hidden xl:flex items-center justify-center shrink-0">
-            <nav className="flex items-center p-1 rounded-2xl bg-slate-100/90 border border-slate-200/70 text-sm font-medium gap-1 shadow-2xs">
-              <Link
-                to="/explore"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/explore')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Explore
-              </Link>
+          {/* Desktop navigation */}
+          <nav aria-label="Main" className="hidden xl:flex items-center gap-0.5">
+            {NAV_LINKS.map((l) => (
+              <NavLink key={l.to} to={l.to} className={linkClass}>
+                {l.label}
+              </NavLink>
+            ))}
+          </nav>
 
-              <Link
-                to="/categories"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/categories')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Activities
-              </Link>
-
-              <Link
-                to="/events"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/events')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Events
-              </Link>
-
-              <Link
-                to="/blogs"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/blogs')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Stories
-              </Link>
-
-              <Link
-                to="/members"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/members')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Members
-              </Link>
-
-              <Link
-                to="/organizations"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-medium hover:scale-[1.02] active:scale-95 ${
-                  isActive('/organizations')
-                    ? 'bg-white text-[#C8382C] shadow-xs font-semibold border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                Organizations
-              </Link>
-
-              <Link
-                to="/donate"
-                className={`px-3.5 py-1.5 rounded-xl transition-all duration-200 ease-out whitespace-nowrap text-sm font-semibold hover:scale-[1.02] active:scale-95 ${
-                  isActive('/donate')
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-emerald-700 bg-emerald-50/90 hover:bg-emerald-100'
-                }`}
-              >
-                Donate
-              </Link>
-            </nav>
-          </div>
-
-          {/* RIGHT SEARCH & ACTION HUB (RIGHT ALIGNED, SINGLE-LINE ELEGANT) */}
-          <div className="flex-1 flex items-center justify-end gap-2.5 shrink-0 whitespace-nowrap">
-            
-            {/* Inline Desktop Search Bar */}
-            <form onSubmit={handleSearch} className="hidden lg:flex items-center relative shrink-0">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-28 xl:w-36 focus:w-48 bg-slate-100/90 focus:bg-white border border-slate-200/80 focus:border-[#C8382C] focus:ring-2 focus:ring-[#C8382C]/15 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-800 font-medium placeholder-slate-400 outline-none transition-all duration-300"
-              />
-            </form>
-
-            {/* Social Media Links directly inside Navbar */}
-            <div className="hidden 2xl:flex items-center gap-1 border-r border-slate-200/80 pr-2 mr-0.5 text-slate-500 shrink-0">
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" title="Join us on Facebook" className="p-1.5 rounded-lg hover:text-[#1877F2] hover:bg-slate-100 transition-all">
-                <Facebook className="w-4 h-4" />
-              </a>
-              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" title="Subscribe on YouTube" className="p-1.5 rounded-lg hover:text-[#FF0000] hover:bg-slate-100 transition-all">
-                <Youtube className="w-4 h-4" />
-              </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" title="Follow us on Instagram" className="p-1.5 rounded-lg hover:text-[#E4405F] hover:bg-slate-100 transition-all">
-                <Instagram className="w-4 h-4" />
-              </a>
-              <a href="https://x.com" target="_blank" rel="noopener noreferrer" title="Follow us on X (Twitter)" className="p-1.5 rounded-lg hover:text-black hover:bg-slate-100 transition-all">
-                <Twitter className="w-4 h-4" />
-              </a>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Search */}
+            <div className="relative hidden sm:block">
+              {searchOpen ? (
+                <form onSubmit={handleSearch} className="flex items-center animate-in">
+                  <Search className="w-4 h-4 text-muted absolute left-3.5 pointer-events-none" aria-hidden="true" />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onBlur={() => !searchQuery && setSearchOpen(false)}
+                    placeholder="Search people, causes, events…"
+                    aria-label="Search Hateymalo"
+                    className="field !rounded-full !py-2 pl-10 w-56 lg:w-72"
+                  />
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-ink-soft hover:bg-paper-deep transition-colors"
+                  aria-label="Open search"
+                >
+                  <Search className="w-[18px] h-[18px]" />
+                </button>
+              )}
             </div>
 
+            {donationsOn && (
+              <Link
+                to="/donate"
+                className="hidden lg:inline-flex btn btn-sm !px-3.5 text-pine bg-pine-tint hover:bg-[#d5e7de] border border-pine/15"
+              >
+                <Heart className="w-4 h-4 fill-pine/80" aria-hidden="true" /> Donate
+              </Link>
+            )}
+
             {isAuthenticated ? (
-              <div className="flex items-center gap-2.5 shrink-0">
+              <>
                 <NotificationDropdown />
 
-                <Link
-                  to="/create-post"
-                  className="px-4 py-2 rounded-xl text-sm font-black terracotta-btn text-white shadow-md shadow-[#C8382C]/20 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shrink-0 whitespace-nowrap"
-                >
-                  <PlusCircle className="w-4.5 h-4.5" />
-                  <span className="hidden sm:inline whitespace-nowrap">Create Drive</span>
+                <Link to="/create-post" className="hidden md:inline-flex btn btn-primary btn-sm">
+                  <Plus className="w-4 h-4" aria-hidden="true" /> Ask or offer help
                 </Link>
 
-                <div className="relative shrink-0">
+                <div className="relative" ref={dropdownRef}>
                   <button
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-2.5 p-1.5 pl-2 pr-3 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 transition-all shadow-2xs shrink-0"
+                    type="button"
+                    onClick={() => setDropdownOpen((o) => !o)}
+                    aria-haspopup="menu"
+                    aria-expanded={dropdownOpen}
+                    className="flex items-center gap-2 rounded-full p-1 pr-2 sm:pr-3 border border-sand bg-white hover:border-ink/30 transition-colors"
                   >
-                    <div className="relative">
-                      <img
-                        src={user?.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-                        alt={user?.name}
-                        className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200"
-                      />
-                      {isAdmin && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#C8382C] text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white" title="Admin">
-                          🛡️
-                        </span>
-                      )}
-                    </div>
-                    <div className="hidden sm:flex flex-col text-left">
-                      <span className="text-sm font-black text-slate-900 leading-tight whitespace-nowrap">
-                        {user?.name?.split(' ')[0]}
-                      </span>
-                      <span className="text-[10px] font-black text-[#C8382C] uppercase tracking-wider whitespace-nowrap">
-                        {isAdmin ? 'ADMIN' : user?.memberLevel || 'MEMBER'}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400 ml-0.5" />
+                    <Avatar name={user?.name} src={user?.profilePicture} size="sm" />
+                    <span className="hidden sm:block text-sm font-semibold text-ink max-w-[7rem] truncate">
+                      {user?.name?.split(' ')[0]}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-muted transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-64 rounded-3xl bg-white border border-slate-200/90 shadow-2xl p-2.5 z-50 animate-in fade-in duration-150">
-                      <div className="px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/80 rounded-2xl mb-1.5">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-sm font-black text-slate-900 truncate">{user?.name}</p>
-                          <VerificationBadge level={user?.memberLevel} isVerified={user?.isVerified} />
+                    <div role="menu" className="absolute right-0 mt-2 w-72 card !rounded-2xl p-2 z-50 animate-in zoom-in-95 origin-top-right">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-paper">
+                        <Avatar name={user?.name} src={user?.profilePicture} size="md" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-ink truncate">{user?.name}</p>
+                          <p className="text-xs text-muted truncate">{user?.email}</p>
+                          <div className="mt-1">
+                            <VerificationBadge level={isAdmin ? user?.role : user?.memberLevel} isVerified={user?.isVerified} />
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">{user?.email}</p>
                       </div>
 
-                      <div className="py-1 space-y-1">
+                      <div className="py-1.5 space-y-0.5">
                         {isAdmin && (
                           <>
-                            <Link
-                              to="/admin"
-                              onClick={() => setDropdownOpen(false)}
-                              className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all"
-                            >
-                              <ShieldAlert className="w-4.5 h-4.5 text-rose-700" /> Super Admin Portal
+                            <Link role="menuitem" to="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-brand hover:bg-brand-tint rounded-xl">
+                              <ShieldAlert className="w-4 h-4" /> Admin command center
                             </Link>
-                            <Link
-                              to="/admin-dashboard"
-                              onClick={() => setDropdownOpen(false)}
-                              className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-black text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all"
-                            >
-                              <ShieldAlert className="w-4.5 h-4.5 text-amber-700" /> Moderation Queue
+                            <Link role="menuitem" to="/admin-dashboard" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-marigold-text hover:bg-marigold-tint rounded-xl">
+                              <ShieldCheck className="w-4 h-4" /> Moderation queue
                             </Link>
                           </>
                         )}
-                        <Link
-                          to="/dashboard"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
-                        >
-                          <LayoutDashboard className="w-4.5 h-4.5 text-teal-600" /> User Dashboard
+                        <Link role="menuitem" to="/dashboard" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
+                          <LayoutDashboard className="w-4 h-4 text-pine" /> My dashboard
                         </Link>
-                        <Link
-                          to={`/profile/${user?._id}`}
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
-                        >
-                          <User className="w-4.5 h-4.5 text-sky-600" /> View Profile
+                        <Link role="menuitem" to={`/profile/${user?._id}`} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
+                          <User className="w-4 h-4 text-sky-ink" /> My profile
+                        </Link>
+                        <Link role="menuitem" to="/create-post" className="md:hidden flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
+                          <Plus className="w-4 h-4 text-brand" /> Ask or offer help
                         </Link>
                       </div>
 
-                      <div className="pt-1.5 border-t border-slate-100 mt-1">
+                      <div className="pt-1.5 border-t border-sand">
                         <button
+                          role="menuitem"
+                          type="button"
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted hover:text-brand hover:bg-brand-tint rounded-xl"
                         >
-                          <LogOut className="w-4.5 h-4.5" /> Log Out
+                          <LogOut className="w-4 h-4" /> Log out
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-                <Link
-                  to="/login"
-                  className="px-3.5 py-2 rounded-xl text-sm font-bold text-slate-700 hover:text-[#C8382C] hover:bg-slate-100 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap"
-                >
-                  <LogIn className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="whitespace-nowrap">Log In</span>
+              <>
+                <Link to="/login" className="hidden sm:inline-flex btn btn-sm text-ink-soft hover:bg-paper-deep">
+                  Log in
                 </Link>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 rounded-xl text-sm font-black terracotta-btn shadow-md text-white flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shrink-0 whitespace-nowrap"
-                >
-                  <UserPlus className="w-4 h-4 shrink-0" />
-                  <span className="whitespace-nowrap">Join HAATEMALO</span>
+                <Link to="/register" className="btn btn-primary btn-sm">
+                  Join us
                 </Link>
-              </div>
+              </>
             )}
 
-            {/* MOBILE MENU TRIGGER */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden w-10 h-10 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center"
+              type="button"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              className="xl:hidden w-10 h-10 rounded-full flex items-center justify-center text-ink hover:bg-paper-deep"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
-
         </div>
       </div>
 
-      {/* MOBILE MENU */}
+      {/* Mobile / tablet menu */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-white/98 backdrop-blur-xl border-b border-slate-200 px-4 py-6 space-y-4 animate-in fade-in duration-150 absolute top-full left-0 w-full shadow-2xl z-50">
-          
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search help drives..."
-              className="w-full bg-slate-100 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none font-medium"
-            />
-          </form>
+        <div
+          id="mobile-menu"
+          className="xl:hidden absolute top-full inset-x-0 h-[calc(100dvh-4rem)] sm:h-[calc(100dvh-72px)] overflow-y-auto bg-paper border-t border-sand animate-in"
+        >
+          <div className="container-page py-6 space-y-6">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="w-4 h-4 text-muted absolute left-4 top-1/2 -translate-y-1/2" aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search people, causes, events…"
+                aria-label="Search Hateymalo"
+                className="field !rounded-full pl-11"
+              />
+            </form>
 
-          <div className="grid grid-cols-2 gap-2 text-sm font-bold">
-            <Link to="/explore" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><Compass className="w-5 h-5 text-[#C8382C]" /> Explore</Link>
-            <Link to="/categories" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><Grid className="w-5 h-5 text-teal-600" /> Activities</Link>
-            <Link to="/events" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><Calendar className="w-5 h-5 text-amber-600" /> Events</Link>
-            <Link to="/blogs" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><BookOpen className="w-5 h-5 text-purple-600" /> Stories</Link>
-            <Link to="/members" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><Users className="w-5 h-5 text-sky-600" /> Members</Link>
-            <Link to="/organizations" onClick={() => setMobileMenuOpen(false)} className="p-3.5 rounded-xl bg-slate-100 text-slate-800 flex items-center gap-2.5"><Building2 className="w-5 h-5 text-indigo-600" /> Organizations</Link>
-            <Link to="/donate" onClick={() => setMobileMenuOpen(false)} className="col-span-2 p-3.5 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center gap-2.5 font-black border border-emerald-200"><Heart className="w-5 h-5 fill-emerald-600 text-emerald-600" /> Donate & Support</Link>
+            <nav aria-label="Mobile" className="grid grid-cols-2 gap-2.5">
+              {NAV_LINKS.map(({ to, label, icon: Icon }, i) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  style={{ animationDelay: `${i * 30}ms` }}
+                  className={({ isActive }) =>
+                    `animate-in animate-rise card !rounded-2xl p-4 flex flex-col gap-2 ${isActive ? '!border-brand' : ''}`
+                  }
+                >
+                  <Icon className="w-5 h-5 text-brand" aria-hidden="true" />
+                  <span className="font-semibold text-ink">{label}</span>
+                </NavLink>
+              ))}
+              {donationsOn && (
+                <Link to="/donate" className="col-span-2 btn btn-pine btn-lg">
+                  <Heart className="w-5 h-5" aria-hidden="true" /> Support a cause
+                </Link>
+              )}
+            </nav>
+
+            {!isAuthenticated ? (
+              <div className="grid grid-cols-2 gap-2.5 pt-4 border-t border-sand">
+                <Link to="/login" className="btn btn-ghost">Log in</Link>
+                <Link to="/register" className="btn btn-primary">Join Hateymalo</Link>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-4 border-t border-sand">
+                <Link to="/create-post" className="btn btn-primary w-full"><Plus className="w-4 h-4" /> Ask or offer help</Link>
+                {isAdmin && <Link to="/admin" className="btn btn-ghost w-full">Admin command center</Link>}
+                <Link to="/dashboard" className="btn btn-ghost w-full">My dashboard</Link>
+                <button type="button" onClick={handleLogout} className="btn w-full text-muted hover:text-brand">Log out</button>
+              </div>
+            )}
           </div>
-
-          {/* Mobile Social Links */}
-          <div className="flex items-center justify-center gap-4 pt-3 border-t border-slate-100 text-slate-600">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Join Us:</span>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" title="Join us on Facebook" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-[#1877F2] transition-colors"><Facebook className="w-4 h-4" /></a>
-            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" title="Subscribe on YouTube" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-[#FF0000] transition-colors"><Youtube className="w-4 h-4" /></a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" title="Follow us on Instagram" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-[#E4405F] transition-colors"><Instagram className="w-4 h-4" /></a>
-            <a href="https://x.com" target="_blank" rel="noopener noreferrer" title="Follow us on X" className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:text-black transition-colors"><Twitter className="w-4 h-4" /></a>
-          </div>
-
-          {!isAuthenticated ? (
-            <div className="flex gap-2 pt-2 border-t border-slate-100">
-              <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="w-1/2 py-3.5 rounded-xl font-bold bg-slate-100 text-center text-sm text-slate-800 flex items-center justify-center gap-2"><LogIn className="w-4 h-4 text-slate-500" /> Log In</Link>
-              <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="w-1/2 py-3.5 rounded-xl font-bold terracotta-btn text-center text-sm text-white flex items-center justify-center gap-2"><UserPlus className="w-4 h-4" /> Join HAATEMALO</Link>
-            </div>
-          ) : (
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              {isAdmin && <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="block p-3.5 rounded-xl bg-rose-50 text-sm font-bold text-[#C8382C] text-center">🛡️ Super Admin Portal</Link>}
-              <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block p-3.5 rounded-xl bg-slate-100 text-sm font-bold text-teal-700 text-center">User Dashboard</Link>
-              <button onClick={handleLogout} className="w-full text-center p-3.5 rounded-xl bg-rose-50 text-sm font-bold text-rose-700">Log Out</button>
-            </div>
-          )}
         </div>
       )}
     </header>

@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import {
-  ShieldCheck,
-  Receipt,
-  Plus,
-  DollarSign,
-  TrendingUp,
-  FileCheck,
-  Image,
-  Eye,
-  X,
-} from 'lucide-react';
+import { ShieldCheck, ReceiptText, Plus, Eye, X, Target, HandCoins, ArrowDownRight, Wallet } from 'lucide-react';
+
+const npr = (n) => `NPR ${Number(n || 0).toLocaleString('en-IN')}`;
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
+
+const SummaryTile = ({ icon: Icon, label, value, tone }) => (
+  <div className="surface-sunken p-4 sm:p-5 space-y-1.5">
+    <p className="text-xs text-muted font-semibold flex items-center gap-1.5">
+      <Icon className={`w-4 h-4 ${tone}`} aria-hidden="true" /> {label}
+    </p>
+    <p className="font-display text-xl sm:text-2xl font-bold text-ink tabular-nums">{value}</p>
+  </div>
+);
 
 const FinancialTransparencySection = ({ campaignId, isOrganizer }) => {
   const { user, isAdmin } = useAuth();
@@ -47,6 +49,15 @@ const FinancialTransparencySection = ({ campaignId, isOrganizer }) => {
   useEffect(() => {
     if (campaignId) fetchTransparency();
   }, [campaignId]);
+
+  useEffect(() => {
+    if (!previewImage) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setPreviewImage(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewImage]);
 
   const handleAddExpense = async (e) => {
     e.preventDefault();
@@ -83,208 +94,277 @@ const FinancialTransparencySection = ({ campaignId, isOrganizer }) => {
   };
 
   if (loading) {
-    return <div className="h-40 bg-slate-800/40 animate-pulse rounded-3xl" />;
+    return <div className="h-64 bg-paper-deep animate-pulse rounded-[var(--radius-card)]" aria-label="Loading ledger" />;
   }
 
-  if (!ledgerData) return null;
+  if (!ledgerData) {
+    return (
+      <div className="card p-6 text-center text-muted">
+        We couldn't load this ledger right now. Please try again in a moment.
+      </div>
+    );
+  }
 
   const { campaign, totalCollected, totalSpent, netRemainingBalance, expenses } = ledgerData;
   const goalAmount = campaign.goalAmount;
   const remainingGoal = Math.max(0, goalAmount - totalCollected);
+  const raisedPct = goalAmount ? Math.min(100, Math.round((totalCollected / goalAmount) * 100)) : 0;
+  const spentPct = totalCollected ? Math.min(100, Math.round((totalSpent / totalCollected) * 100)) : 0;
+  const canLog = isOrganizer || isAdmin;
 
   return (
-    <div className="glass-panel p-6 sm:p-8 rounded-3xl space-y-6 border border-emerald-500/30 bg-emerald-950/10 shadow-xl">
-      
+    <section className="card p-5 sm:p-8 space-y-7" aria-labelledby={`ledger-title-${campaignId}`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-500/20 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-            <ShieldCheck className="w-6 h-6" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-pine-tint text-pine flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-6 h-6" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-xl font-extrabold text-white">Financial Transparency & Expense Ledger</h3>
-            <p className="text-xs text-emerald-300/80">Itemized expense reports with supporting receipt proofs</p>
+            <h3 id={`ledger-title-${campaignId}`} className="text-xl font-semibold text-ink">Transparency ledger</h3>
+            <p className="text-sm text-muted">Every expense, with the receipt where one was attached.</p>
           </div>
         </div>
 
-        {(isOrganizer || isAdmin) && (
+        {canLog && (
           <button
+            type="button"
             onClick={() => setShowExpenseForm(!showExpenseForm)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md transition-all flex items-center gap-1.5 shrink-0"
+            className={`btn btn-sm shrink-0 ${showExpenseForm ? 'btn-ghost' : 'btn-pine'}`}
+            aria-expanded={showExpenseForm}
           >
-            <Plus className="w-4 h-4" /> {showExpenseForm ? 'Cancel' : 'Add Expense Record'}
+            {showExpenseForm ? <X className="w-4 h-4" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
+            {showExpenseForm ? 'Cancel' : 'Add expense record'}
           </button>
         )}
       </div>
 
-      {/* Campaign Fund Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-        <div className="glass-panel p-4 rounded-2xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-400 font-semibold uppercase">Fundraising Goal</p>
-          <p className="text-xl font-black text-white">NPR {goalAmount.toLocaleString()}</p>
+      {/* Summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <SummaryTile icon={Target} label="Goal" value={npr(goalAmount)} tone="text-ink-soft" />
+        <SummaryTile icon={HandCoins} label="Raised" value={npr(totalCollected)} tone="text-pine" />
+        <SummaryTile icon={ArrowDownRight} label="Spent" value={npr(totalSpent)} tone="text-brand" />
+        <SummaryTile icon={Wallet} label="Balance held" value={npr(netRemainingBalance)} tone="text-marigold-text" />
+      </div>
+
+      {/* Bars */}
+      <div className="grid sm:grid-cols-2 gap-5">
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-ink-soft font-semibold">Raised of goal</span>
+            <span className="text-muted tabular-nums">{raisedPct}%{remainingGoal > 0 ? ` · ${npr(remainingGoal)} to go` : ''}</span>
+          </div>
+          <div className="progress-track" role="progressbar" aria-valuenow={raisedPct} aria-valuemin={0} aria-valuemax={100} aria-label="Raised of goal">
+            <div className="progress-fill" style={{ width: `${raisedPct}%` }} />
+          </div>
         </div>
-        <div className="glass-panel p-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-1">
-          <p className="text-[10px] text-emerald-400 font-semibold uppercase">Total Raised</p>
-          <p className="text-xl font-black text-emerald-300">NPR {totalCollected.toLocaleString()}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-rose-500/30 bg-rose-950/20 space-y-1">
-          <p className="text-[10px] text-rose-400 font-semibold uppercase">Total Spent</p>
-          <p className="text-xl font-black text-rose-300">NPR {totalSpent.toLocaleString()}</p>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl border border-amber-500/30 bg-amber-950/20 space-y-1">
-          <p className="text-[10px] text-amber-400 font-semibold uppercase">Remaining Balance</p>
-          <p className="text-xl font-black text-amber-300">NPR {netRemainingBalance.toLocaleString()}</p>
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-ink-soft font-semibold">Spent of raised</span>
+            <span className="text-muted tabular-nums">{spentPct}%</span>
+          </div>
+          <div className="progress-track" role="progressbar" aria-valuenow={spentPct} aria-valuemin={0} aria-valuemax={100} aria-label="Spent of raised">
+            <div className="h-full rounded-full bg-pine transition-[width] duration-1000" style={{ width: `${spentPct}%` }} />
+          </div>
         </div>
       </div>
 
       {/* Expense Upload Form */}
-      {(isOrganizer || isAdmin) && showExpenseForm && (
-        <form onSubmit={handleAddExpense} className="p-5 rounded-2xl bg-slate-900 border border-emerald-500/40 space-y-4 animate-in fade-in duration-200">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-            Log New Expense & Upload Receipt Proof
-          </h4>
-          
+      {canLog && showExpenseForm && (
+        <form onSubmit={handleAddExpense} className="surface-sunken p-5 sm:p-6 space-y-4 animate-rise">
+          <h4 className="font-semibold text-ink">Log a new expense</h4>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Expense Title *</label>
+              <label htmlFor={`exp-title-${campaignId}`} className="field-label">Expense title *</label>
               <input
+                id={`exp-title-${campaignId}`}
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. 50 Heavy Duty Trash Bags & Rubber Gloves"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none"
+                placeholder="e.g. 50 heavy-duty trash bags and gloves"
+                className="field"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Amount Spent (NPR) *</label>
+              <label htmlFor={`exp-amount-${campaignId}`} className="field-label">Amount spent (NPR) *</label>
               <input
+                id={`exp-amount-${campaignId}`}
                 type="number"
                 required
                 min={1}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="e.g. 4500"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none"
+                className="field"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Receipt Image URL (Proof)</label>
+              <label htmlFor={`exp-proof-${campaignId}`} className="field-label">Receipt image URL</label>
               <input
+                id={`exp-proof-${campaignId}`}
                 type="url"
                 value={proofUrl}
                 onChange={(e) => setProofUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none"
+                placeholder="https://…"
+                className="field"
               />
+              <p className="text-xs text-muted mt-1">A photo of the bill helps supporters trust the record.</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Spent Date</label>
+              <label htmlFor={`exp-date-${campaignId}`} className="field-label">Date spent</label>
               <input
+                id={`exp-date-${campaignId}`}
                 type="date"
                 value={spentDate}
                 onChange={(e) => setSpentDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none"
+                className="field"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Notes / Vendor Details</label>
+            <label htmlFor={`exp-notes-${campaignId}`} className="field-label">Notes / vendor details</label>
             <input
+              id={`exp-notes-${campaignId}`}
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g., Purchased from New Road Hardware Store with official VAT bill."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white outline-none"
+              placeholder="e.g. Purchased from a local hardware store with VAT bill"
+              className="field"
             />
           </div>
 
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2.5 rounded-xl font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs shadow-md"
-            >
-              {submitting ? 'Logging...' : 'Save Expense Record'}
+            <button type="submit" disabled={submitting} className="btn btn-pine">
+              {submitting ? 'Saving…' : 'Save expense record'}
             </button>
           </div>
         </form>
       )}
 
-      {/* Itemized Expenses Table */}
+      {/* Itemized expenses */}
       <div className="space-y-3">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-          <Receipt className="w-4 h-4 text-emerald-400" /> Itemized Expense Log ({expenses.length} records)
+        <h4 className="text-sm font-semibold text-ink-soft flex items-center gap-1.5">
+          <ReceiptText className="w-4 h-4 text-pine" aria-hidden="true" /> Itemised expenses
+          <span className="text-muted font-normal">({expenses.length} {expenses.length === 1 ? 'record' : 'records'})</span>
         </h4>
 
         {expenses.length > 0 ? (
-          <div className="overflow-x-auto rounded-2xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 font-bold uppercase border-b border-slate-800">
-                <tr>
-                  <th className="p-3">Expense Item</th>
-                  <th className="p-3">Date</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Proof Receipt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {expenses.map((exp) => (
-                  <tr key={exp._id} className="hover:bg-slate-900/60 transition-colors">
-                    <td className="p-3">
-                      <p className="font-bold text-white">{exp.title}</p>
-                      {exp.notes && <p className="text-[11px] text-slate-400 mt-0.5">{exp.notes}</p>}
-                    </td>
-                    <td className="p-3 text-slate-400">
-                      {new Date(exp.spentDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-3 font-bold text-rose-300">
-                      NPR {exp.amount.toLocaleString()}
-                    </td>
-                    <td className="p-3">
-                      {exp.proofImages && exp.proofImages.length > 0 ? (
-                        <button
-                          onClick={() => setPreviewImage(exp.proofImages[0])}
-                          className="flex items-center gap-1 text-teal-400 hover:text-teal-300 font-semibold"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View Receipt
-                        </button>
-                      ) : (
-                        <span className="text-slate-500 italic">No image attached</span>
-                      )}
-                    </td>
+          <>
+            {/* Desktop / tablet table */}
+            <div className="hidden sm:block overflow-x-auto rounded-2xl border border-sand">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-paper text-xs uppercase tracking-wider text-muted">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-semibold">Item</th>
+                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">Date</th>
+                    <th scope="col" className="px-4 py-3 font-semibold text-right">Amount</th>
+                    <th scope="col" className="px-4 py-3 font-semibold">Receipt</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-sand bg-white">
+                  {expenses.map((exp) => (
+                    <tr key={exp._id} className="hover:bg-paper/60 transition-colors align-top">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-ink">{exp.title}</p>
+                        {exp.notes && <p className="text-xs text-muted mt-0.5">{exp.notes}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-ink-soft whitespace-nowrap">{fmtDate(exp.spentDate)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-ink tabular-nums whitespace-nowrap">{npr(exp.amount)}</td>
+                      <td className="px-4 py-3">
+                        {exp.proofImages && exp.proofImages.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage(exp.proofImages[0])}
+                            className="inline-flex items-center gap-1.5 font-semibold text-sky-ink hover:underline min-h-8"
+                          >
+                            <Eye className="w-4 h-4" aria-hidden="true" /> View
+                          </button>
+                        ) : (
+                          <span className="text-muted">Not attached</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-paper border-t border-sand">
+                  <tr>
+                    <th scope="row" colSpan={2} className="px-4 py-3 font-semibold text-ink">Total spent</th>
+                    <td className="px-4 py-3 text-right font-bold text-ink tabular-nums whitespace-nowrap">{npr(totalSpent)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Mobile list */}
+            <ul className="sm:hidden divide-y divide-sand rounded-2xl border border-sand bg-white">
+              {expenses.map((exp) => (
+                <li key={exp._id} className="p-4 space-y-1.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-ink">{exp.title}</p>
+                    <p className="font-semibold text-ink tabular-nums whitespace-nowrap">{npr(exp.amount)}</p>
+                  </div>
+                  {exp.notes && <p className="text-xs text-muted">{exp.notes}</p>}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-ink-soft">{fmtDate(exp.spentDate)}</span>
+                    {exp.proofImages && exp.proofImages.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage(exp.proofImages[0])}
+                        className="inline-flex items-center gap-1.5 font-semibold text-sky-ink min-h-10"
+                      >
+                        <Eye className="w-4 h-4" aria-hidden="true" /> Receipt
+                      </button>
+                    ) : (
+                      <span className="text-muted">No receipt</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+              <li className="p-4 flex items-center justify-between bg-paper rounded-b-2xl">
+                <span className="font-semibold text-ink">Total spent</span>
+                <span className="font-bold text-ink tabular-nums">{npr(totalSpent)}</span>
+              </li>
+            </ul>
+          </>
         ) : (
-          <div className="p-6 rounded-2xl bg-slate-900/60 text-center text-xs text-slate-400">
-            No expenses logged yet.
+          <div className="surface-sunken p-6 text-center text-sm text-muted">
+            No expenses have been logged yet. Anything spent from this campaign will appear here.
           </div>
         )}
       </div>
 
-      {/* Image Preview Modal */}
+      {/* Receipt preview */}
       {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="glass-panel max-w-xl w-full p-4 rounded-3xl space-y-3 relative border border-slate-700">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <span className="text-xs font-bold text-white">Receipt Proof Document</span>
-              <button onClick={() => setPreviewImage(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-in"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPreviewImage(null);
+          }}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="receipt-preview-title" className="card !rounded-3xl max-w-xl w-full p-4 sm:p-5 space-y-3 animate-pop">
+            <div className="flex justify-between items-center">
+              <span id="receipt-preview-title" className="font-semibold text-ink">Receipt</span>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-paper-deep"
+                aria-label="Close receipt"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
-            <img src={previewImage} alt="Receipt proof" className="w-full max-h-96 object-contain rounded-2xl" />
+            <img src={previewImage} alt="Expense receipt" className="w-full max-h-[70vh] object-contain rounded-2xl bg-paper" />
           </div>
         </div>
       )}
-
-    </div>
+    </section>
   );
 };
 

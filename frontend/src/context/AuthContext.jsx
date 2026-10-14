@@ -93,6 +93,8 @@ export const AuthProvider = ({ children }) => {
         refreshUser,
         isAdmin: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(user?.role),
         isSuperAdmin: user?.role === 'SUPER_ADMIN',
+        // Staff permission check (the server enforces the same rules; this only hides UI)
+        can: (permission) => user?.role === 'SUPER_ADMIN' || (user?.permissions || []).includes(permission),
       }}
     >
       {children}

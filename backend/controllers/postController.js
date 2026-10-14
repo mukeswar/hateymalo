@@ -1,6 +1,11 @@
 const Post = require('../models/Post');
 const { isStaff } = require('../utils/roles');
+const { hasPermission } = require('../utils/permissions');
 const { getSettings } = require('../utils/settingsCache');
+
+// Public creator fields; email is private and only shown to staff.
+const creatorFields = (staff, extra = '') =>
+  `name profilePicture location memberLevel isVerified role ${staff ? 'email ' : ''}${extra}`.trim();
 
 // @desc    Create a new post
 // @route   POST /api/posts
@@ -109,11 +114,22 @@ const getPublicPosts = async (req, res) => {
   try {
     const { category, location, search, sort, status, featured } = req.query;
 
+    // Unmoderated (pending/rejected/draft) posts: staff who moderate see all of
+    // them; a signed-in member sees only their own; anonymous callers none.
+    const moderator = req.user && hasPermission(req.user, 'canApprovePosts');
+    const staff = req.user && isStaff(req.user);
     let query = {};
+    const restrict = [];
     if (status && status !== 'ALL') {
       query.status = status;
+      if (status !== 'APPROVED' && !moderator) {
+        if (!req.user) query.status = 'APPROVED';
+        else query.creator = req.user._id;
+      }
     } else if (!status) {
       query.status = 'APPROVED';
+    } else if (!moderator) {
+      restrict.push(req.user ? { $or: [{ status: 'APPROVED' }, { creator: req.user._id }] } : { status: 'APPROVED' });
     }
 
     // Featured filter: only currently-featured (non-expired) posts.
@@ -146,8 +162,10 @@ const getPublicPosts = async (req, res) => {
     if (sort === 'oldest') sortOption = { createdAt: 1 };
     if (featuredOnly) sortOption = { featuredOrder: 1, createdAt: -1 };
 
+    if (restrict.length) query.$and = [...(query.$and || []), ...restrict];
+
     const posts = await Post.find(query)
-      .populate('creator', 'name profilePicture location email')
+      .populate('creator', creatorFields(staff))
       .populate('joinedUsers', 'name profilePicture location')
       .sort(sortOption);
 
@@ -166,19 +184,20 @@ const getPublicPosts = async (req, res) => {
 // @access  Public (Conditional for non-approved posts)
 const getPostById = async (req, res) => {
   try {
+    const staff = req.user && isStaff(req.user);
     const post = await Post.findById(req.params.id)
-      .populate('creator', 'name profilePicture location email bio skills')
+      .populate('creator', creatorFields(staff, 'bio skills'))
       .populate('joinedUsers', 'name profilePicture location bio skills');
 
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
 
-    // If post is not APPROVED, check authorization if user is logged in
+    // Non-approved posts are visible only to their creator and to staff
+    // (optionalAuth has verified the token; a bare header no longer unlocks them).
     if (post.status !== 'APPROVED') {
-      // Check if authorization header present and verify
-      const authHeader = req.headers.authorization;
-      if (!authHeader) {
+      const isCreator = req.user && post.creator?._id?.toString() === req.user._id.toString();
+      if (!isCreator && !staff) {
         return res.status(403).json({
           success: false,
           message: 'This post is currently pending review or not public.',
@@ -292,7 +311,7 @@ const updatePostStatus = async (req, res) => {
     // Role checks — moderation actions are allowed for any staff role
     // (SUPER_ADMIN, ADMIN, MODERATOR), not just an exact 'ADMIN'.
     if (['APPROVED', 'REJECTED', 'HIDDEN', 'ARCHIVED'].includes(status)) {
-      if (!isStaff(req.user)) {
+      if (!hasPermission(req.user, 'canApprovePosts')) {
         return res.status(403).json({ success: false, message: 'Only moderators or admins can change moderation status' });
       }
     }
@@ -348,7 +367,7 @@ const updatePostStatus = async (req, res) => {
 // @access  Private/Staff
 const toggleFeaturedPost = async (req, res) => {
   try {
-    if (!isStaff(req.user)) {
+    if (!hasPermission(req.user, 'canApprovePosts')) {
       return res.status(403).json({ success: false, message: 'Only moderators or admins can feature posts' });
     }
 
@@ -399,7 +418,7 @@ const deletePost = async (req, res) => {
     }
 
     const isCreator = post.creator.toString() === req.user._id.toString();
-    const isAdmin = isStaff(req.user);
+    const isAdmin = hasPermission(req.user, 'canDeletePosts');
 
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this post' });
