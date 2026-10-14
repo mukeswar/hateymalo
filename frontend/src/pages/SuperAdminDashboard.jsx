@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useId } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useId, Suspense, lazy } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Avatar from '../components/ui/Avatar';
+import StaffTemplates from './admin/sponsorship/StaffTemplates';
+import SponsorshipOverviewCard from './admin/sponsorship/SponsorshipOverviewCard';
 import {
   AreaChart,
   Area,
@@ -53,11 +55,24 @@ import {
   QrCode,
   ShieldCheck,
   Globe,
+  Handshake,
+  Landmark,
 } from 'lucide-react';
 
 /* --------------------------------------------------------------------------
    Presentational helpers (markup only — no data logic lives here)
    -------------------------------------------------------------------------- */
+
+// Sponsorship sections load on demand (they are large and staff-only)
+const OpportunitiesTab = lazy(() => import('./admin/sponsorship/OpportunitiesTab'));
+const DealsTab = lazy(() => import('./admin/sponsorship/DealsTab'));
+const SponsorsTab = lazy(() => import('./admin/sponsorship/SponsorsTab'));
+const SectionLoading = () => (
+  <div className="flex items-center justify-center gap-3 py-16" role="status" aria-live="polite">
+    <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-sand border-t-brand" aria-hidden="true" />
+    <span className="text-sm text-muted">Loading…</span>
+  </div>
+);
 
 const CHART_COLORS = ['#B5232C', '#1E5A47', '#E9A23B', '#2F5D8A', '#6B6157', '#8E1A22'];
 
@@ -155,7 +170,8 @@ const FeatureButton = ({ featured, onClick }) => (
 // Finance permissions are grouped separately because they expose donor data.
 const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
   if (!catalog) return <p className="text-sm text-muted">Loading permissions…</p>;
-  const finance = ['canViewDonations', 'canManageDonations'];
+  const finance = ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'];
+  const sponsorship = ['canManageSponsorships', 'canManageBrandKits'];
   const toggle = (key, on) => onChange(on ? [...new Set([...value, key])] : value.filter((k) => k !== key));
   const group = (title, items, warn) => (
     <fieldset className="space-y-2">
@@ -180,8 +196,9 @@ const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
   );
   return (
     <div className="space-y-4">
-      {group('Moderation & community', catalog.permissions.filter((p) => !finance.includes(p.key)))}
-      {group('Finance (confidential)', catalog.permissions.filter((p) => finance.includes(p.key)), 'Only grant to people you trust with donor names, amounts and transaction IDs.')}
+      {group('Moderation & community', catalog.permissions.filter((p) => !finance.includes(p.key) && !sponsorship.includes(p.key)))}
+      {group('Sponsorship', catalog.permissions.filter((p) => sponsorship.includes(p.key)))}
+      {group('Finance (confidential)', catalog.permissions.filter((p) => finance.includes(p.key)), 'Only grant to people you trust with donor and sponsor names, amounts and transaction IDs.')}
       <p className="text-xs text-muted">Settings, staff management, roles and the activity log always stay with the Super Admin.</p>
     </div>
   );
@@ -262,19 +279,34 @@ const SuperAdminDashboard = () => {
     donations: 'canViewDonations',
     campaigns: 'canViewDonations',
     expenses: 'canViewDonations',
+    // Sponsorship: a list means "any of these"
+    sponsorship: 'canManageSponsorships',
+    sponsorDeals: ['canManageSponsorships', 'canManageSponsorFinance', 'canManageBrandKits'],
+    sponsors: ['canManageSponsorships', 'canManageSponsorFinance'],
     admins: 'super',
     settings: 'super',
     logs: 'super',
   };
   const canTab = (tab) => {
+    if (!(tab in TAB_ACCESS)) return false;
     const need = TAB_ACCESS[tab];
     if (!need) return true;
+    if (Array.isArray(need)) return need.some((p) => can(p));
     return need === 'super' ? isSuperAdmin : can(need);
   };
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Deep links such as /admin?tab=sponsorDeals&deal=<id> (used by notifications)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get('tab');
+    return t && canTab(t) ? t : 'dashboard';
+  });
+  // Sponsorship tabs load their own data; this asks them to reload (top-bar refresh)
+  const [sponsorRefresh, setSponsorRefresh] = useState(0);
+  // { deal?, opportunity?, sponsor?, nonce } — opens / filters the deals pipeline
+  const [dealFocus, setDealFocus] = useState(null);
   // Mobile navigation drawer (the sidebar is always visible from lg up)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -534,6 +566,25 @@ const SuperAdminDashboard = () => {
     setFilterCategory('All');
     setFilterStatus('All');
     fetchTabData(tab);
+  };
+
+  // Apply ?tab= / ?deal= whenever they appear (also when a notification is opened while already here)
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const deal = searchParams.get('deal');
+    if (!tab && !deal) return;
+    if (tab && canTab(tab)) handleTabChange(tab);
+    if (deal && canTab('sponsorDeals')) {
+      if (tab !== 'sponsorDeals') handleTabChange('sponsorDeals');
+      setDealFocus({ deal, nonce: Date.now() });
+    }
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const openDealsFor = (focus) => {
+    setDealFocus({ ...focus, nonce: Date.now() });
+    handleTabChange('sponsorDeals');
   };
 
   // --- ACTIONS ---
@@ -1032,6 +1083,14 @@ const SuperAdminDashboard = () => {
       ],
     },
     {
+      label: 'Sponsorship',
+      items: [
+        { id: 'sponsorship', label: 'Opportunities & tiers', icon: Landmark },
+        { id: 'sponsorDeals', label: 'Sponsor deals', icon: Handshake },
+        { id: 'sponsors', label: 'Sponsor accounts', icon: Building2 },
+      ],
+    },
+    {
       label: 'System',
       items: [
         { id: 'admins', label: 'Admins & roles', icon: ShieldAlert },
@@ -1196,7 +1255,10 @@ const SuperAdminDashboard = () => {
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               <button
                 type="button"
-                onClick={() => fetchTabData(activeTab)}
+                onClick={() => {
+                  fetchTabData(activeTab);
+                  setSponsorRefresh((k) => k + 1);
+                }}
                 aria-label="Refresh live data"
                 title="Refresh live data"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-soft hover:bg-paper"
@@ -1258,6 +1320,10 @@ const SuperAdminDashboard = () => {
                     <KpiTile label="Total donations" value={stats.totalDonations} hint="Voluntary funds" hintClass="text-pine" icon={DollarSign} tone="bg-pine-tint text-pine" className="col-span-2 lg:col-span-1" />
                   )}
                 </div>
+              )}
+
+              {(can('canManageSponsorships') || can('canManageSponsorFinance')) && (
+                <SponsorshipOverviewCard onOpen={handleTabChange} />
               )}
 
               {/* CHARTS ROW */}
@@ -2084,6 +2150,30 @@ const SuperAdminDashboard = () => {
           )}
 
           {/* ========================================================================= */}
+          {/* SPONSORSHIP (components live in pages/admin/sponsorship) */}
+          {/* ========================================================================= */}
+          <Suspense fallback={<SectionLoading />}>
+          {activeTab === 'sponsorship' && (
+            <OpportunitiesTab
+              search={searchQuery}
+              refreshKey={sponsorRefresh}
+              onViewDeals={(opportunity) => openDealsFor({ opportunity })}
+              onViewSponsors={() => handleTabChange('sponsors')}
+            />
+          )}
+          {activeTab === 'sponsorDeals' && (
+            <DealsTab focus={dealFocus} onFocusHandled={() => setDealFocus(null)} search={searchQuery} refreshKey={sponsorRefresh} />
+          )}
+          {activeTab === 'sponsors' && (
+            <SponsorsTab
+              search={searchQuery}
+              refreshKey={sponsorRefresh}
+              onViewDeals={canTab('sponsorDeals') ? (sponsor) => openDealsFor({ sponsor }) : undefined}
+            />
+          )}
+          </Suspense>
+
+          {/* ========================================================================= */}
           {/* TAB 15: ADMINS & RBAC */}
           {/* ========================================================================= */}
           {activeTab === 'admins' && (
@@ -2126,7 +2216,7 @@ const SuperAdminDashboard = () => {
                             {(admin.permissions?.length ? admin.permissions : presetFor(admin.role)).map((p) => (
                               <span
                                 key={p}
-                                className={`chip ${['canViewDonations', 'canManageDonations'].includes(p) ? 'bg-marigold-tint text-marigold-text' : 'bg-paper-deep text-ink-soft'}`}
+                                className={`chip ${['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'].includes(p) ? 'bg-marigold-tint text-marigold-text' : 'bg-paper-deep text-ink-soft'}`}
                               >
                                 {permissionLabel(p)}
                               </span>
@@ -2431,6 +2521,11 @@ const SuperAdminDashboard = () => {
               </select>
               <p className="mt-1.5 text-sm text-muted">Changing the role resets the ticks below to that role's defaults. Adjust them as needed.</p>
             </div>
+            <StaffTemplates
+              catalog={accessCatalog}
+              value={staffForm.permissions || []}
+              onApply={(permissions) => setStaffForm({ ...staffForm, permissions })}
+            />
             <AccessChecklist
               catalog={accessCatalog}
               value={staffForm.permissions || []}
@@ -2463,6 +2558,11 @@ const SuperAdminDashboard = () => {
                 <option value="ADMIN">Admin — also manages members, events and causes</option>
               </select>
             </div>
+            <StaffTemplates
+              catalog={accessCatalog}
+              value={editingAccess.permissions}
+              onApply={(permissions) => setEditingAccess({ ...editingAccess, permissions })}
+            />
             <AccessChecklist
               catalog={accessCatalog}
               value={editingAccess.permissions}

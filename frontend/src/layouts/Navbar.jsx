@@ -23,6 +23,8 @@ import {
   BookOpen,
   Building2,
   Users,
+  Handshake,
+  Briefcase,
 } from 'lucide-react';
 
 export const BrandLockup = ({ compact = false }) => (
@@ -46,6 +48,7 @@ const NAV_LINKS = [
   { to: '/blogs', label: 'Stories', icon: BookOpen },
   { to: '/organizations', label: 'Organizations', icon: Building2 },
   { to: '/members', label: 'Members', icon: Users },
+  { to: '/sponsor', label: 'Sponsor', icon: Handshake },
 ];
 
 const Navbar = () => {
@@ -243,6 +246,9 @@ const Navbar = () => {
                         <Link role="menuitem" to="/dashboard" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
                           <LayoutDashboard className="w-4 h-4 text-pine" /> My dashboard
                         </Link>
+                        <Link role="menuitem" to="/sponsor/portal" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
+                          <Briefcase className="w-4 h-4 text-marigold-text" /> Sponsor portal
+                        </Link>
                         <Link role="menuitem" to={`/profile/${user?._id}`} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-paper rounded-xl">
                           <User className="w-4 h-4 text-sky-ink" /> My profile
                         </Link>
@@ -340,6 +346,7 @@ const Navbar = () => {
                 <Link to="/create-post" className="btn btn-primary w-full"><Plus className="w-4 h-4" /> Ask or offer help</Link>
                 {isAdmin && <Link to="/admin" className="btn btn-ghost w-full">Admin command center</Link>}
                 <Link to="/dashboard" className="btn btn-ghost w-full">My dashboard</Link>
+                <Link to="/sponsor/portal" className="btn btn-ghost w-full">Sponsor portal</Link>
                 <button type="button" onClick={handleLogout} className="btn w-full text-muted hover:text-brand">Log out</button>
               </div>
             )}

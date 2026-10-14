@@ -8,7 +8,7 @@ const AuditLog = require('../models/AuditLog');
 const PlatformSettings = require('../models/PlatformSettings');
 const Notification = require('../models/Notification');
 const { createAuditLog } = require('../utils/auditLogger');
-const { hasPermission, sanitizePermissions, PERMISSIONS, ROLE_PRESETS, effectivePermissions } = require('../utils/permissions');
+const { hasPermission, sanitizePermissions, PERMISSIONS, ROLE_PRESETS, STAFF_TEMPLATES, effectivePermissions } = require('../utils/permissions');
 const { invalidateSettingsCache } = require('../utils/settingsCache');
 
 // @desc    Get Super Admin Recharts Analytics & Statistics
@@ -253,7 +253,7 @@ const createStaffAccount = async (req, res) => {
 // @route   GET /api/super-admin/access-catalog
 // @access  Private/SuperAdmin
 const getAccessCatalog = (req, res) => {
-  res.json({ success: true, data: { permissions: PERMISSIONS, rolePresets: ROLE_PRESETS } });
+  res.json({ success: true, data: { permissions: PERMISSIONS, rolePresets: ROLE_PRESETS, staffTemplates: STAFF_TEMPLATES } });
 };
 
 // @desc    Update Staff Permissions (Super Admin only)

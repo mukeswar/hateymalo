@@ -5,8 +5,10 @@ import {
   Bell,
   BookOpen,
   Building2,
+  BriefcaseBusiness,
   ChevronRight,
   Compass,
+  Handshake,
   Heart,
   Info,
   LayoutDashboard,
@@ -193,6 +195,8 @@ export default function Account() {
           { icon: Compass, label: 'Help requests', tint: colors.brand, onPress: () => router.push('/explore') },
           { icon: LayoutGrid, label: 'Causes', hint: 'Browse by category', tint: colors.brand, onPress: go('/categories') },
           { icon: CalendarDays, label: 'Events', tint: colors.brand, onPress: () => router.push('/events') },
+          { icon: Handshake, label: 'Sponsor a campaign', hint: 'For companies, NGOs and businesses', tint: colors.pine, onPress: go('/sponsor') },
+          isAuthenticated ? { icon: BriefcaseBusiness, label: 'Sponsor portal', hint: 'Your sponsor accounts and deals', tint: colors.pine, onPress: go('/sponsor/portal') } : null,
         ]}
       />
 

@@ -24,6 +24,7 @@ const notificationSchema = new mongoose.Schema(
         'ANNOUNCEMENT',
         'EVENT',
         'WARNING',
+        'SPONSORSHIP',
       ],
       required: true,
     },
@@ -50,6 +51,12 @@ const notificationSchema = new mongoose.Schema(
     announcement: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Announcement',
+    },
+    // In-app path to open (e.g. /sponsor/portal/deals/<id>) for notifications
+    // that are not about a post, blog, event or announcement
+    link: {
+      type: String,
+      default: '',
     },
     read: {
       type: Boolean,

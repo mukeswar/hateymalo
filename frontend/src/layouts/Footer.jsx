@@ -11,6 +11,7 @@ const COLUMNS = [
       { to: '/categories', label: 'Causes' },
       { to: '/events', label: 'Events' },
       { to: '/create-post', label: 'Ask or offer help' },
+      { to: '/sponsor', label: 'Sponsor a campaign' },
     ],
   },
   {

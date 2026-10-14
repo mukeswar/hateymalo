@@ -64,6 +64,13 @@ const connect = async () => {
     return connectAtlas(uri);
   }
 
+  // Local development/testing against a throwaway database, even when
+  // backend/.env points at the live Atlas cluster (see backend/dev.env)
+  if (process.env.USE_MEMORY_DB === 'true') {
+    console.log('USE_MEMORY_DB=true: skipping MONGODB_URI and using a local/in-memory database');
+    return connectLocalFallback();
+  }
+
   // If MONGODB_URI is specified in environment, try connecting to it first
   if (uri) {
     try {

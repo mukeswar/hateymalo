@@ -11,6 +11,7 @@ import {
   Bell,
   BookOpen,
   Briefcase,
+  BriefcaseBusiness,
   Building2,
   CalendarDays,
   Clock,
@@ -18,6 +19,7 @@ import {
   Flag,
   GraduationCap,
   HandHeart,
+  Handshake,
   HandHelping,
   HeartHandshake,
   Info,
@@ -247,6 +249,8 @@ export default function HomeScreen() {
     { label: 'Organisations', icon: Building2, to: '/organizations' },
     { label: 'Causes', icon: Sparkles, to: '/categories' },
     ...(donationsOn ? [{ label: 'Donate', icon: HeartHandshake, to: '/donate' }] : []),
+    { label: 'Sponsor', icon: Handshake, to: '/sponsor' },
+    ...(isAuthenticated ? [{ label: 'Sponsor portal', icon: BriefcaseBusiness, to: '/sponsor/portal' }] : []),
     { label: 'About', icon: Info, to: '/about' },
   ];
 

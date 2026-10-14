@@ -53,6 +53,12 @@ export default function RootLayout() {
               <Stack.Screen name="about" options={{ title: 'About' }} />
               <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
               <Stack.Screen name="dashboard" options={{ title: 'My dashboard' }} />
+              <Stack.Screen name="sponsor/index" options={{ title: 'Sponsor a campaign' }} />
+              <Stack.Screen name="sponsor/[id]" options={{ title: 'Sponsorship' }} />
+              <Stack.Screen name="sponsor/portal/index" options={{ title: 'Sponsor portal' }} />
+              <Stack.Screen name="sponsor/portal/deal/[id]" options={{ title: 'Sponsorship deal' }} />
+              <Stack.Screen name="sponsor/portal/account/[id]" options={{ title: 'Sponsor account' }} />
+              <Stack.Screen name="sponsor/organize/[id]" options={{ title: 'Organise campaign' }} />
               <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
             </Stack>
           </ToastProvider>

@@ -7,6 +7,7 @@ import {
   BellOff,
   CheckCheck,
   CheckCircle2,
+  Handshake,
   Heart,
   LogIn,
   Megaphone,
@@ -41,8 +42,40 @@ const getIcon = (type) => {
     case 'ANNOUNCEMENT':
     case 'EVENT': return { Icon: Megaphone, tone: TONES.marigold };
     case 'WARNING': return { Icon: AlertTriangle, tone: TONES.marigold };
+    case 'SPONSORSHIP': return { Icon: Handshake, tone: TONES.pine };
     default: return { Icon: Bell, tone: TONES.plain };
   }
+};
+
+// Map a web path stored in `notification.link` (sponsorship notifications) to
+// the matching app route. Unknown links return null and are ignored.
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const mapWebLink = (link) => {
+  if (typeof link !== 'string' || !link.startsWith('/')) return null;
+  const [rawPath, query = ''] = link.split('?');
+  const path = rawPath.replace(/\/+$/, '') || '/';
+  const params = {};
+  query.split('&').filter(Boolean).forEach((kv) => {
+    const [k, val = ''] = kv.split('=');
+    try { params[decodeURIComponent(k)] = decodeURIComponent(val); } catch { /* malformed */ }
+  });
+  if (path === '/sponsor/portal') return '/sponsor/portal';
+  if (path === '/sponsor') return '/sponsor';
+  let m = path.match(/^\/sponsor\/portal\/deals\/([^/]+)$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/portal/deal/${m[1]}`;
+  m = path.match(/^\/sponsor\/portal\/accounts\/([^/]+)$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/portal/account/${m[1]}`;
+  m = path.match(/^\/sponsor\/opportunities\/([^/]+)$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/${m[1]}`;
+  m = path.match(/^\/organize\/([^/]+)$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/organize/${m[1]}`;
+  if (path === '/admin' || path === '/admin-dashboard') {
+    if (params.tab === 'sponsorDeals') return params.deal && OBJECT_ID.test(params.deal) ? `/admin/sponsorDeals?deal=${params.deal}` : '/admin/sponsorDeals';
+    if (params.tab === 'sponsors') return '/admin/sponsors';
+    if (params.tab === 'sponsorship') return '/admin/sponsorship';
+    return null;
+  }
+  return null;
 };
 
 // Resolve which app screen a notification opens, from the entity it references
@@ -56,7 +89,7 @@ const getDestination = (n) => {
   if (eventId) return `/event/${eventId}`;
   if (postId) return `/post/${postId}`;
   if (announcementId) return '/';
-  return null;
+  return mapWebLink(n.link);
 };
 
 export default function Notifications() {

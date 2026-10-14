@@ -17,9 +17,21 @@ const PERMISSIONS = [
   { key: 'canManageOrganizations', label: 'Manage organisations', hint: 'Register organisation accounts.' },
   { key: 'canViewDonations', label: 'View donations', hint: 'See donor names, amounts, transaction IDs and the expense ledger.' },
   { key: 'canManageDonations', label: 'Manage finances', hint: 'Launch or delete campaigns and add or delete expenses.' },
+  { key: 'canManageSponsorships', label: 'Manage sponsorships', hint: 'Create sponsorship opportunities and tiers, review and agree sponsor deals, track deliverables.' },
+  { key: 'canManageBrandKits', label: 'Manage brand kits', hint: 'Arrange sponsor logos on vests, banners and ID cards and export print artwork.' },
+  { key: 'canManageSponsorFinance', label: 'Sponsorship payments', hint: 'Record and remove sponsor payments and see received amounts.' },
 ];
 
 const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
+
+// Job templates the Super Admin can apply to a staff member in one click
+// (Campaign Manager, Media Team, Finance Team). Like role presets, finance
+// keys are only ever in the Finance Team template.
+const STAFF_TEMPLATES = {
+  CAMPAIGN_MANAGER: { label: 'Campaign Manager', permissions: ['canManageSponsorships', 'canManageBrandKits', 'canManageEvents'] },
+  MEDIA_TEAM: { label: 'Media Team', permissions: ['canManageBrandKits'] },
+  FINANCE_TEAM: { label: 'Finance Team', permissions: ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'] },
+};
 
 const ROLE_PRESETS = {
   MODERATOR: ['canApprovePosts', 'canDeletePosts', 'canManageReports'],
@@ -32,6 +44,8 @@ const ROLE_PRESETS = {
     'canSendNotifications',
     'canManageCategories',
     'canManageOrganizations',
+    'canManageSponsorships',
+    'canManageBrandKits',
   ],
 };
 
@@ -50,4 +64,4 @@ const hasPermission = (user, key) => effectivePermissions(user).includes(key);
 // Keeps only known permission keys (used when a Super Admin saves a staff member's access)
 const sanitizePermissions = (list) => (Array.isArray(list) ? [...new Set(list.filter((p) => PERMISSION_KEYS.includes(p)))] : []);
 
-module.exports = { PERMISSIONS, PERMISSION_KEYS, ROLE_PRESETS, effectivePermissions, hasPermission, sanitizePermissions };
+module.exports = { PERMISSIONS, PERMISSION_KEYS, ROLE_PRESETS, STAFF_TEMPLATES, effectivePermissions, hasPermission, sanitizePermissions };

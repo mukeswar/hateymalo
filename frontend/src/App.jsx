@@ -28,6 +28,14 @@ const Donate = lazy(() => import('./pages/Donate'));
 const GlobalSearch = lazy(() => import('./pages/GlobalSearch'));
 const Organizations = lazy(() => import('./pages/Organizations'));
 
+// Campaign sponsorship (funding + visibility for organised campaigns)
+const SponsorLanding = lazy(() => import('./pages/sponsorship/SponsorLanding'));
+const OpportunityProposal = lazy(() => import('./pages/sponsorship/OpportunityProposal'));
+const SponsorPortal = lazy(() => import('./pages/sponsorship/SponsorPortal'));
+const SponsorDeal = lazy(() => import('./pages/sponsorship/SponsorDeal'));
+const SponsorAccount = lazy(() => import('./pages/sponsorship/SponsorAccount'));
+const OrganizerWorkspace = lazy(() => import('./pages/sponsorship/OrganizerWorkspace'));
+
 // Master Admin Dashboards
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -77,6 +85,14 @@ function App() {
           <Route path="/donate" element={<Donate />} />
           <Route path="/search" element={<GlobalSearch />} />
           <Route path="/organizations" element={<Organizations />} />
+
+          {/* Sponsorship */}
+          <Route path="/sponsor" element={<SponsorLanding />} />
+          <Route path="/sponsor/opportunities/:id" element={<OpportunityProposal />} />
+          <Route path="/sponsor/portal" element={<ProtectedRoute><SponsorPortal /></ProtectedRoute>} />
+          <Route path="/sponsor/portal/deals/:id" element={<ProtectedRoute><SponsorDeal /></ProtectedRoute>} />
+          <Route path="/sponsor/portal/accounts/:id" element={<ProtectedRoute><SponsorAccount /></ProtectedRoute>} />
+          <Route path="/organize/:id" element={<ProtectedRoute><OrganizerWorkspace /></ProtectedRoute>} />
 
           {/* User Protected Routes */}
           <Route

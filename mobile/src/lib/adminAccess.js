@@ -33,6 +33,14 @@ export const ADMIN_GROUPS = [
     ],
   },
   {
+    label: 'Sponsorship',
+    items: [
+      { id: 'sponsorship', label: 'Opportunities & tiers', icon: 'Handshake', need: 'canManageSponsorships' },
+      { id: 'sponsorDeals', label: 'Sponsor deals', icon: 'BriefcaseBusiness', need: ['canManageSponsorships', 'canManageSponsorFinance', 'canManageBrandKits'] },
+      { id: 'sponsors', label: 'Sponsor accounts', icon: 'Building', need: ['canManageSponsorships', 'canManageSponsorFinance'] },
+    ],
+  },
+  {
     label: 'System',
     items: [
       { id: 'admins', label: 'Admins & roles', icon: 'ShieldAlert', need: 'super' },
@@ -46,6 +54,7 @@ export const canAccessSection = (need, { isAdmin, isSuperAdmin, can }) => {
   if (!isAdmin) return false;
   if (need === null || need === undefined) return true;
   if (need === 'super') return isSuperAdmin;
+  if (Array.isArray(need)) return need.some((p) => can(p)); // any one of these permissions
   return can(need);
 };
 

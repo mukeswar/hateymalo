@@ -5,6 +5,7 @@
       "name": "backend",
       "runtimeExecutable": "node",
       "runtimeArgs": [
+        "--env-file=backend/dev.env",
         "backend/server.js"
       ],
       "port": 5000
@@ -33,6 +34,23 @@
         "8081"
       ],
       "port": 8081
+    },
+    {
+      "name": "backend-live-db",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "backend/server.js"
+      ],
+      "port": 5000
+    },
+    {
+      "name": "frontend-5174",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_API_URL=http://localhost:5000/api&& npm --prefix frontend run dev -- --port 5174 --strictPort"
+      ],
+      "port": 5174
     }
   ]
 }

@@ -82,3 +82,8 @@ the props above — its owner is building it in parallel. Never create a file ow
   `curl -s "http://localhost:8081/src/app/<route>.bundle?platform=web&dev=true" -o /dev/null -w "%{http_code}\n"`
   (e.g. `src/app/admin/members`, `src/app/(tabs)/explore`). Do not start another
   Metro/expo server and do not drive the browser pane — the lead verifies UI at the end.
+
+## Sponsorship module
+
+The sponsorship API, permissions, enums, routes and the shared artwork generator are specified in
+`../docs/SPONSORSHIP.md`. Read it before touching any sponsorship screen.

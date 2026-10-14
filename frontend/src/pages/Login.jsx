@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -30,6 +30,7 @@ const Login = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,10 +45,16 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const loggedUser = await login(cleanEmail, password);
+      const result = await login(cleanEmail, password);
+      const role = result?.data?.role || result?.role;
       showToast('Welcome back to HATEYMALO!', 'success');
 
-      if (['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(loggedUser?.role)) {
+      // Return to the page that asked for a login (internal paths only)
+      const from = location.state?.from;
+      const fromPath = typeof from === 'string' ? from : from?.pathname ? `${from.pathname}${from.search || ''}` : '';
+      if (fromPath.startsWith('/') && !fromPath.startsWith('//') && fromPath !== '/login') {
+        navigate(fromPath, { replace: true });
+      } else if (['SUPER_ADMIN', 'ADMIN', 'MODERATOR'].includes(role)) {
         navigate('/admin');
       } else {
         navigate('/dashboard');
