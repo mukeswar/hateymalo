@@ -49,6 +49,7 @@ app.use('/api/badges', require('./routes/badgeRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/sponsorship', require('./routes/sponsorshipRoutes'));
 app.use('/api/ads', require('./routes/adRoutes'));
+app.use('/api/revenue', require('./routes/revenueRoutes'));
 const { getPlatformSettings } = require('./controllers/superAdminController');
 const { getPublicStats } = require('./controllers/statsController');
 

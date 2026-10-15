@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { AdView } from '../../../components/ads/AdSlot';
 import AdReport from '../../../components/ads/AdReport';
+import SubjectInvoices from '../revenue/SubjectInvoices';
 import {
   CREATIVE_STATUS, DELIVERY, FORMAT_LABELS, OBJECTIVE_LABELS, SURFACE_LABELS,
   AdChip, num, nprAd, pct, previewAd, priceLine,
@@ -99,7 +100,9 @@ const AdCampaignDrawer = ({ campaignId, onClose, onChanged }) => {
     { id: 'details', label: 'Details & pricing' },
     { id: 'report', label: 'Report' },
     { id: 'history', label: 'History' },
+    ...(can('canManageRevenue') ? [{ id: 'invoices', label: 'Invoices' }] : []),
   ];
+  const invoiceable = c && ['APPROVED', 'PAUSED', 'ENDED', 'ARCHIVED'].includes(c.status) && (c.bookedValue || 0) > 0;
 
   return (
     <Drawer
@@ -269,6 +272,10 @@ const AdCampaignDrawer = ({ campaignId, onClose, onChanged }) => {
           )}
 
           {tab === 'report' && <AdReport campaignId={c._id} title={c.title} />}
+
+          {tab === 'invoices' && can('canManageRevenue') && (
+            <SubjectInvoices campaign={c} canInvoice={invoiceable} blockedNote="Only approved campaigns with a booked value can be invoiced." />
+          )}
 
           {tab === 'history' && (
             <ol className="space-y-3 border-l border-sand pl-4">

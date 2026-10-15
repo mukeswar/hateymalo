@@ -12,6 +12,7 @@ import {
   LogIn,
   Megaphone,
   MessageSquare,
+  ReceiptText,
   UserPlus,
 } from 'lucide-react-native';
 import API, { errorMessage } from '../lib/api';
@@ -44,6 +45,7 @@ const getIcon = (type) => {
     case 'WARNING': return { Icon: AlertTriangle, tone: TONES.marigold };
     case 'SPONSORSHIP': return { Icon: Handshake, tone: TONES.pine };
     case 'ADVERTISING': return { Icon: Megaphone, tone: TONES.brand };
+    case 'BILLING': return { Icon: ReceiptText, tone: TONES.sky };
     default: return { Icon: Bell, tone: TONES.plain };
   }
 };
@@ -71,6 +73,9 @@ const mapWebLink = (link) => {
   if (path === '/sponsor/ads') return '/sponsor/ads';
   m = path.match(/^\/sponsor\/ads\/([^/]+)$/);
   if (m && OBJECT_ID.test(m[1])) return `/sponsor/ads/${m[1]}`;
+  if (path === '/sponsor/invoices') return '/sponsor/invoices';
+  m = path.match(/^\/sponsor\/invoices\/([^/]+)(\/print)?$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/invoices/${m[1]}`;
   m = path.match(/^\/organize\/([^/]+)$/);
   if (m && OBJECT_ID.test(m[1])) return `/sponsor/organize/${m[1]}`;
   if (path === '/admin' || path === '/admin-dashboard') {
@@ -79,6 +84,9 @@ const mapWebLink = (link) => {
     if (params.tab === 'sponsorship') return '/admin/sponsorship';
     if (params.tab === 'ads') return params.campaign && OBJECT_ID.test(params.campaign) ? `/admin/ads?campaign=${params.campaign}` : '/admin/ads';
     if (params.tab === 'adPlacements') return '/admin/adPlacements';
+    if (params.tab === 'invoices') return params.invoice && OBJECT_ID.test(params.invoice) ? `/admin/invoices?invoice=${params.invoice}` : '/admin/invoices';
+    if (params.tab === 'revenue') return '/admin/revenue';
+    if (params.tab === 'ledger') return '/admin/ledger';
     return null;
   }
   return null;

@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Image } from 'expo-image';
-import { ArrowRight, CheckCircle2, FileText, Lock, Plus, Send, Share2, Trash2 } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ArrowRight, CheckCircle2, ExternalLink, FileText, Lock, Plus, Send, Share2, Trash2 } from 'lucide-react-native';
 import API, { errorMessage } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { SubjectInvoices } from '../revenue/RevenueBits';
 import { confirm } from '../../lib/confirm';
 import { formatDate, formatDateTime, formatNPR, humanize, timeAgo } from '../../lib/format';
 import { colors, fonts, radius, space } from '../../theme';
@@ -409,7 +412,14 @@ const Payments = ({ deal, onDeal, showToast }) => {
   const [f, setF] = useState({ amount: '', method: 'BANK_TRANSFER', reference: '', receivedAt: toDateInput(new Date()), note: '' });
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState('');
+  // 409s from the revenue module: the deal has an open invoice / the payment came from an invoice
+  const [blocked, setBlocked] = useState(null);
   const contracted = CONTRACTED_STAGES.includes(deal.stage);
+  const invoiceConflict = (err) => {
+    if (err?.response?.status !== 409) return false;
+    setBlocked({ message: errorMessage(err, 'Record this on the invoice instead.'), invoice: err.response.data?.invoice || null });
+    return true;
+  };
   const record = async () => {
     if (!(intOr0(f.amount) >= 1)) return showToast('Amount must be at least Rs. 1', 'error');
     if (f.method !== 'CASH' && !f.reference.trim()) return showToast('Add the bank or transaction reference', 'error');
@@ -419,8 +429,10 @@ const Payments = ({ deal, onDeal, showToast }) => {
       const res = await API.post(`/sponsorship/deals/${deal._id}/payments`, { amount: intOr0(f.amount), method: f.method, reference: f.reference.trim(), receivedAt: f.receivedAt || undefined, note: f.note.trim() });
       onDeal(res.data.data);
       setF((x) => ({ ...x, amount: '', reference: '', note: '' }));
+      setBlocked(null);
       showToast(res.data?.message || 'Payment recorded', 'success');
     } catch (err) {
+      invoiceConflict(err);
       showToast(errorMessage(err, 'Could not record the payment'), 'error');
     } finally {
       setBusy('');
@@ -433,8 +445,10 @@ const Payments = ({ deal, onDeal, showToast }) => {
       const res = await API.delete(`/sponsorship/deals/${deal._id}/payments/${p._id}`, { params: reason.trim() ? { reason: reason.trim() } : undefined });
       onDeal(res.data.data);
       setReason('');
+      setBlocked(null);
       showToast(res.data?.message || 'Payment removed', 'success');
     } catch (err) {
+      invoiceConflict(err);
       showToast(errorMessage(err, 'Could not remove the payment'), 'error');
     } finally {
       setBusy('');
@@ -450,6 +464,12 @@ const Payments = ({ deal, onDeal, showToast }) => {
           <Chip label={`Outstanding ${formatNPR(Math.max(0, deal.cashAmount - deal.amountReceived))}`} tone={{ bg: colors.marigoldTint, fg: colors.marigoldText }} />
         ) : null}
       </Row>
+      {blocked ? (
+        <Box tone="warn">
+          <T variant="small" style={{ color: colors.marigoldText }}>{blocked.message}</T>
+          {blocked.invoice ? <Button title="Open the invoice" icon={ExternalLink} size="sm" variant="ghost" onPress={() => router.push(`/admin/invoice/${blocked.invoice}`)} /> : null}
+        </Box>
+      ) : null}
       {!payments.length ? <T variant="small">No payments recorded.</T> : null}
       {payments.map((p) => (
         <Box key={p._id}>
@@ -460,7 +480,11 @@ const Payments = ({ deal, onDeal, showToast }) => {
           <T variant="small">{`${humanize(p.method)}${p.reference ? ` · ${p.reference}` : ''}`}</T>
           {p.note ? <T variant="small">{p.note}</T> : null}
           {p.recordedBy?.name ? <T variant="caption" style={{ color: colors.muted }}>{`Recorded by ${p.recordedBy.name}`}</T> : null}
-          <Button title="Remove" icon={Trash2} variant="danger" size="sm" loading={busy === p._id} onPress={() => remove(p)} />
+          {p.invoice ? (
+            <Button title="Recorded on an invoice — open it" icon={ExternalLink} variant="ghost" size="sm" onPress={() => router.push(`/admin/invoice/${p.invoice?._id || p.invoice}`)} />
+          ) : (
+            <Button title="Remove" icon={Trash2} variant="danger" size="sm" loading={busy === p._id} onPress={() => remove(p)} />
+          )}
         </Box>
       ))}
       {payments.length ? <Field label="Reason for removing a payment (audit log)" value={reason} onChangeText={setReason} maxLength={300} /> : null}
@@ -533,7 +557,9 @@ const Report = ({ deal, onDeal, showToast }) => {
 /* ---------- Main ---------- */
 
 export default function AdminDealDetail({ deal, onDeal, showToast }) {
+  const { can } = useAuth();
   const v = deal.viewer || {};
+  const revenue = can('canManageRevenue');
   const s = deal.sponsor || {};
   const sponsorStatusTone = s.verificationStatus === 'VERIFIED' ? 'VERIFIED' : s.verificationStatus === 'REJECTED' ? 'REJECTED' : 'PENDING';
   return (
@@ -618,6 +644,14 @@ export default function AdminDealDetail({ deal, onDeal, showToast }) {
         <Section title="Payments" hint="Finance only. Received cash is tracked separately from in-kind value.">
           <Payments deal={deal} onDeal={onDeal} showToast={showToast} />
         </Section>
+      ) : null}
+
+      {revenue ? (
+        <SubjectInvoices
+          query={`deal=${deal._id}`}
+          hint="Finance only. A deal is never invoiced for more than its contracted cash."
+          createHref={CONTRACTED_STAGES.includes(deal.stage) && s._id ? `/admin/invoices?new=1&account=${s._id}&deal=${deal._id}&sponsorName=${encodeURIComponent(s.name || '')}` : null}
+        />
       ) : null}
 
       <Section title="Impact report">

@@ -58,6 +58,8 @@ const dealSchema = new mongoose.Schema(
         note: { type: String, default: '', maxlength: 300 },
         recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         recordedAt: { type: Date, default: Date.now },
+        // Set when the payment was recorded against an invoice (see Invoice.payments)
+        invoice: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', default: null },
       },
     ],
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { Stack, router, useFocusEffect } from 'expo-router';
-import { Building2, ChevronRight, Handshake, LogIn, Megaphone, Plus, Search } from 'lucide-react-native';
+import { Building2, ChevronRight, Handshake, LogIn, Megaphone, Plus, ReceiptText, Search } from 'lucide-react-native';
 import API, { errorMessage } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { formatNPR, humanize, timeAgo } from '../../../lib/format';
@@ -182,6 +182,20 @@ export default function SponsorPortal() {
               <View style={{ flex: 1, gap: 2 }}>
                 <T variant="semibold">Advertising</T>
                 <T variant="caption">Sponsored cards, banners and videos on the website and the app, with reports.</T>
+              </View>
+              <ChevronRight size={18} color={colors.muted} />
+            </Row>
+          </Card>
+
+          {/* Invoices (issued to these sponsor accounts) */}
+          <Card onPress={() => router.push('/sponsor/invoices')} style={{ gap: 6 }} accessibilityLabel="Invoices — bills for your sponsorships and ads">
+            <Row gap={12}>
+              <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.skyTint, alignItems: 'center', justifyContent: 'center' }}>
+                <ReceiptText size={22} color={colors.sky} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <T variant="semibold">Invoices</T>
+                <T variant="caption">Bills for your sponsorships and ads — what is paid and what is still due.</T>
               </View>
               <ChevronRight size={18} color={colors.muted} />
             </Row>

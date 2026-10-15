@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Archive, CheckCircle2, Megaphone, Pause, Pencil, Play, Send, ShieldAlert, Square, Trash2, Undo2, XCircle } from 'lucide-react-native';
 import API, { errorMessage } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import { SubjectInvoices } from '../revenue/RevenueBits';
 import { confirm } from '../../lib/confirm';
 import { formatNPR, formatNumber, humanize } from '../../lib/format';
 import { colors, space } from '../../theme';
@@ -78,6 +80,7 @@ const ReviewPanel = ({ c, onDone, showToast }) => {
 
 export default function CampaignDetail({ id, mode = 'advertiser', showToast }) {
   const staff = mode === 'staff';
+  const { can } = useAuth();
   const { data: c, setData, loading, refreshing, error, status, reload, refresh } = useSponsorApi(id ? `/ads/campaigns/${id}` : null, { fallback: 'Could not load this campaign.' });
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState('');
@@ -262,6 +265,13 @@ export default function CampaignDetail({ id, mode = 'advertiser', showToast }) {
         </>
       )}
 
+      {staff && can('canManageRevenue') ? (
+        <SubjectInvoices
+          query={`adCampaign=${c._id}`}
+          hint="Finance only. A campaign is never invoiced for more than its booked value."
+          createHref={['APPROVED', 'PAUSED', 'ENDED', 'ARCHIVED'].includes(c.status) && c.advertiser?._id ? `/admin/invoices?new=1&account=${c.advertiser._id}&adCampaign=${c._id}&sponsorName=${encodeURIComponent(c.advertiser.name || '')}` : null}
+        />
+      ) : null}
       <CampaignReport campaignId={c._id} showToast={showToast} reloadKey={reportKey} />
       <HistoryList history={c.history} />
       <View style={{ height: space.lg }} />

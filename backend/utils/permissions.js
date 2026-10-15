@@ -21,6 +21,7 @@ const PERMISSIONS = [
   { key: 'canManageBrandKits', label: 'Manage brand kits', hint: 'Arrange sponsor logos on vests, banners and ID cards and export print artwork.' },
   { key: 'canManageSponsorFinance', label: 'Sponsorship payments', hint: 'Record and remove sponsor payments and see received amounts, and read ad revenue and reports.' },
   { key: 'canManageAds', label: 'Manage ad campaigns', hint: 'Create and edit ad campaigns for advertisers, set custom prices and read ad reports.' },
+  { key: 'canManageRevenue', label: 'Invoices & revenue ledger', hint: 'Issue and void invoices, record payments, keep the revenue ledger and billing profile.' },
   { key: 'canReviewAds', label: 'Review ads & placements', hint: 'Approve, reject and pause ads, and manage ad placements and rate cards.' },
 ];
 
@@ -32,7 +33,7 @@ const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 const STAFF_TEMPLATES = {
   CAMPAIGN_MANAGER: { label: 'Campaign Manager', permissions: ['canManageSponsorships', 'canManageBrandKits', 'canManageEvents', 'canManageAds'] },
   MEDIA_TEAM: { label: 'Media Team', permissions: ['canManageBrandKits'] },
-  FINANCE_TEAM: { label: 'Finance Team', permissions: ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'] },
+  FINANCE_TEAM: { label: 'Finance Team', permissions: ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance', 'canManageRevenue'] },
 };
 
 const ROLE_PRESETS = {

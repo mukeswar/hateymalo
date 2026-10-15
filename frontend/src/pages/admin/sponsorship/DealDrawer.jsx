@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Send, Lock, Plus, Trash2, ExternalLink, BadgeCheck, AlertTriangle, Globe, Mail, Phone, CircleDot, ArrowRight, FileText,
+  Send, Lock, Plus, Trash2, ExternalLink, BadgeCheck, AlertTriangle, Globe, Mail, Phone, CircleDot, ArrowRight, FileText, ReceiptText,
 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import API from '../../../services/api';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import InvoiceForm from '../revenue/InvoiceForm';
+import { InvoiceChip, OverdueChip, rs } from '../../../components/revenue/revenueShared';
 import Avatar from '../../../components/ui/Avatar';
 import {
   SP, RESOURCE_TYPES, DELIVERABLE_TYPES, DELIVERABLE_STATUSES, VALUATION_METHODS, INKIND_STATUSES, PAYMENT_METHODS,
@@ -600,8 +604,15 @@ const Deliverables = ({ deal, apply }) => {
 
 /* ---------------- Payments (finance only) ---------------- */
 
+// Link to an invoice in the admin Invoices tab (finance with canManageRevenue)
+const invoiceLink = (id) => `/admin?tab=invoices&invoice=${id}`;
+
 const Payments = ({ deal, apply }) => {
   const { showToast } = useToast();
+  const { can } = useAuth();
+  const canInvoices = can('canManageRevenue');
+  // { message, invoice } when the server says the payment belongs on an invoice (409)
+  const [blocked, setBlocked] = useState(null);
   const [f, setF] = useState({ amount: '', method: 'BANK_TRANSFER', reference: '', receivedAt: toDateInput(new Date()), note: '' });
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState(null);
@@ -619,8 +630,10 @@ const Payments = ({ deal, apply }) => {
       const res = await API.post(`${SP}/deals/${deal._id}/payments`, { ...f, amount: Number(f.amount) });
       apply(res.data.data);
       setF({ amount: '', method: 'BANK_TRANSFER', reference: '', receivedAt: toDateInput(new Date()), note: '' });
+      setBlocked(null);
       showToast(res.data.message || 'Payment recorded', 'success');
     } catch (err) {
+      if (err?.response?.status === 409 && err.response.data?.invoice) setBlocked({ message: err.response.data.message, invoice: err.response.data.invoice });
       showToast(errMsg(err, 'Could not record the payment'), 'error');
     } finally {
       setBusy(false);
@@ -633,6 +646,8 @@ const Payments = ({ deal, apply }) => {
       showToast(res.data.message || 'Payment removed', 'success');
       setRemoving(null);
     } catch (err) {
+      if (err?.response?.status === 409 && err.response.data?.invoice) setBlocked({ message: err.response.data.message, invoice: err.response.data.invoice });
+      setRemoving(null);
       showToast(errMsg(err, 'Could not remove the payment'), 'error');
     }
   };
@@ -656,12 +671,31 @@ const Payments = ({ deal, apply }) => {
                   <p className="font-semibold tabular-nums text-ink">{npr(p.amount)} <span className="font-normal text-muted">· {label(p.method)}{p.reference ? ` · ${p.reference}` : ''}</span></p>
                   <p className="text-xs text-muted">Received {fmtDate(p.receivedAt)} · recorded by {p.recordedBy?.name || '—'}{p.note ? ` · ${p.note}` : ''}</p>
                 </div>
-                <button type="button" onClick={() => setRemoving(p)} className={BTN_DANGER}>Remove</button>
+                {p.invoice ? (
+                  canInvoices ? (
+                    <Link to={invoiceLink(p.invoice)} className={BTN_GHOST}><ReceiptText className="h-4 w-4" aria-hidden="true" /> On invoice</Link>
+                  ) : (
+                    <span className="chip bg-paper-deep text-ink-soft">Paid on an invoice</span>
+                  )
+                ) : (
+                  <button type="button" onClick={() => setRemoving(p)} className={BTN_DANGER}>Remove</button>
+                )}
               </li>
             ))}
           </ul>
         )}
       </Section>
+      {blocked && (
+        <p className="flex flex-wrap items-start gap-2 rounded-2xl bg-marigold-tint px-4 py-3 text-sm text-marigold-text" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{blocked.message}</span>
+          {canInvoices ? (
+            <Link to={invoiceLink(blocked.invoice)} className="font-semibold text-ink underline">Open the invoice</Link>
+          ) : (
+            <span className="font-semibold">Ask someone with invoice access to record it.</span>
+          )}
+        </p>
+      )}
       {canRecord ? (
         <form onSubmit={record} className="card space-y-3 p-4">
           <p className="text-sm font-bold text-ink">Record a payment</p>
@@ -702,6 +736,73 @@ const Payments = ({ deal, apply }) => {
         />
       )}
     </div>
+  );
+};
+
+/* ---------------- Invoices (finance with canManageRevenue) ---------------- */
+
+const DealInvoices = ({ deal }) => {
+  const navigate = useNavigate();
+  const [list, setList] = useState(null);
+  const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
+  const canInvoice = CONTRACTED_STAGES.includes(deal.stage) && (deal.cashAmount || 0) > 0;
+  useEffect(() => {
+    API.get('/revenue/invoices', { params: { deal: deal._id } })
+      .then((r) => setList(r.data.data || []))
+      .catch((e) => {
+        setList([]);
+        setError(errMsg(e, 'Could not load invoices'));
+      });
+  }, [deal._id]);
+  return (
+    <Section
+      title="Invoices"
+      actions={
+        canInvoice && (
+          <button type="button" onClick={() => setCreating(true)} className={BTN_PRIMARY}>
+            <Plus className="h-4 w-4" aria-hidden="true" /> Create invoice
+          </button>
+        )
+      }
+    >
+      {!canInvoice && <p className="mb-3 text-sm text-muted">Only agreed deals with a cash amount can be invoiced.</p>}
+      {list === null ? (
+        <Loading>Loading invoices…</Loading>
+      ) : error ? (
+        <p className="text-sm text-brand">{error}</p>
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted">No invoices for this deal yet. While an invoice is open, payments are recorded on the invoice.</p>
+      ) : (
+        <ul className="divide-y divide-sand">
+          {list.map((i) => (
+            <li key={i._id}>
+              <Link to={invoiceLink(i._id)} className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-2 py-2.5 hover:bg-paper">
+                <span className="min-w-0">
+                  <span className="block font-semibold tabular-nums text-ink">{i.number || 'Draft'}</span>
+                  <span className="block text-xs text-muted">{i.issueDate ? `Issued ${fmtDate(i.issueDate)}` : 'Not issued'}{i.dueDate ? ` · due ${fmtDate(i.dueDate)}` : ''}</span>
+                </span>
+                <span className="flex flex-wrap items-center gap-2">
+                  <InvoiceChip status={i.status} />
+                  {i.overdue && <OverdueChip />}
+                  <span className="text-sm font-semibold tabular-nums text-ink">{rs(i.totalPaisa)}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {creating && (
+        <InvoiceForm
+          preset={{ sponsorAccount: idOf(deal.sponsor), subjectType: 'SPONSORSHIP_DEAL', deal: deal._id }}
+          onClose={() => setCreating(false)}
+          onSaved={(inv) => {
+            setCreating(false);
+            navigate(invoiceLink(inv._id));
+          }}
+        />
+      )}
+    </Section>
   );
 };
 
@@ -851,6 +952,8 @@ const DealDrawer = ({ dealId, onClose, onChanged }) => {
     }
   };
 
+  const { can } = useAuth();
+  const canInvoices = can('canManageRevenue');
   const v = deal?.viewer || {};
   const msgCount = (deal?.messages || []).length;
   const tabs = deal
@@ -860,6 +963,7 @@ const DealDrawer = ({ dealId, onClose, onChanged }) => {
         { id: 'messages', label: `Messages${msgCount ? ` (${msgCount})` : ''}` },
         { id: 'deliverables', label: 'Deliverables' },
         ...(v.isFinance ? [{ id: 'payments', label: 'Payments' }] : []),
+        ...(canInvoices ? [{ id: 'invoices', label: 'Invoices' }] : []),
         { id: 'report', label: 'Impact report' },
         { id: 'history', label: 'History' },
       ]
@@ -884,6 +988,7 @@ const DealDrawer = ({ dealId, onClose, onChanged }) => {
             {tab === 'messages' && <Messages deal={deal} apply={apply} />}
             {tab === 'deliverables' && <Deliverables deal={deal} apply={apply} />}
             {tab === 'payments' && v.isFinance && <Payments deal={deal} apply={apply} />}
+            {tab === 'invoices' && canInvoices && <DealInvoices deal={deal} />}
             {tab === 'report' && <Report key={`${deal._id}-${deal.report?.sharedAt || ''}`} deal={deal} apply={apply} />}
             {tab === 'history' && <History deal={deal} />}
           </div>

@@ -40,6 +40,10 @@ const OrganizerWorkspace = lazy(() => import('./pages/sponsorship/OrganizerWorks
 const AdCampaigns = lazy(() => import('./pages/sponsorship/AdCampaigns'));
 const AdCampaign = lazy(() => import('./pages/sponsorship/AdCampaign'));
 const AdCampaignEditor = lazy(() => import('./pages/sponsorship/AdCampaignEditor'));
+// Invoices (docs/REVENUE.md)
+const SponsorInvoices = lazy(() => import('./pages/sponsorship/SponsorInvoices'));
+const SponsorInvoice = lazy(() => import('./pages/sponsorship/SponsorInvoice'));
+const InvoicePrint = lazy(() => import('./pages/revenue/InvoicePrint'));
 
 // Master Admin Dashboards
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
@@ -59,6 +63,7 @@ const PageFallback = () => (
 function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isPrintRoute = /^\/invoices\/[^/]+\/print$/.test(location.pathname);
 
   // Start each new page at the top (hash links like #main keep their own target)
   useEffect(() => {
@@ -67,7 +72,8 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-paper text-ink">
-      {!isAdminRoute && <Navbar />}
+      {/* Site chrome is never printed (invoice print view) */}
+      {!isAdminRoute && <div className="contents print:hidden"><Navbar /></div>}
 
       <main id="main" tabIndex={-1} key={location.pathname} className={isAdminRoute ? 'h-screen w-screen overflow-hidden' : 'flex-grow animate-in slide-in-from-bottom-2 outline-none'}>
         <Suspense fallback={<PageFallback />}>
@@ -104,6 +110,11 @@ function App() {
           <Route path="/sponsor/ads/new" element={<ProtectedRoute><AdCampaignEditor /></ProtectedRoute>} />
           <Route path="/sponsor/ads/:id" element={<ProtectedRoute><AdCampaign /></ProtectedRoute>} />
           <Route path="/sponsor/ads/:id/edit" element={<ProtectedRoute><AdCampaignEditor /></ProtectedRoute>} />
+
+          {/* Invoices: sponsor list/detail; print view for finance staff and the billed sponsor */}
+          <Route path="/sponsor/invoices" element={<ProtectedRoute><SponsorInvoices /></ProtectedRoute>} />
+          <Route path="/sponsor/invoices/:id" element={<ProtectedRoute><SponsorInvoice /></ProtectedRoute>} />
+          <Route path="/invoices/:id/print" element={<ProtectedRoute><InvoicePrint /></ProtectedRoute>} />
 
           {/* User Protected Routes */}
           <Route
@@ -155,8 +166,8 @@ function App() {
         </Suspense>
       </main>
 
-      {!isAdminRoute && !['/login', '/register'].includes(location.pathname) && <QuoteBand key={`quote-${location.pathname}`} />}
-      {!isAdminRoute && <Footer />}
+      {!isAdminRoute && !['/login', '/register'].includes(location.pathname) && !isPrintRoute && <QuoteBand key={`quote-${location.pathname}`} />}
+      {!isAdminRoute && <div className="contents print:hidden"><Footer /></div>}
     </div>
   );
 }

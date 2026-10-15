@@ -5,6 +5,7 @@ import { router, Stack, useFocusEffect } from 'expo-router';
 import {
   AlertTriangle,
   BookOpen,
+  BookOpenText,
   Building2,
   Calendar,
   ChevronRight,
@@ -20,9 +21,11 @@ import {
   Megaphone,
   MessageSquare,
   Receipt,
+  ReceiptText,
   Settings,
   ShieldAlert,
   Target,
+  TrendingUp,
   UserPlus,
   Users,
 } from 'lucide-react-native';
@@ -53,6 +56,9 @@ const ICONS = {
   Settings,
   Lock,
   LayoutTemplate,
+  TrendingUp,
+  ReceiptText,
+  BookOpenText,
 };
 
 const CHART_COLORS = ['#B5232C', '#1E5A47', '#E9A23B', '#2F5D8A', '#6B6157', '#8E1A22'];

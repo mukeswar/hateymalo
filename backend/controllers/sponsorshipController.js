@@ -7,6 +7,9 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { hasPermission } = require('../utils/permissions');
 const { createAuditLog } = require('../utils/auditLogger');
+const LedgerEntry = require('../models/LedgerEntry');
+const Invoice = require('../models/Invoice');
+const { postEntry, reverseEntry, syncDealContracted } = require('../utils/ledger');
 
 const { DELIVERABLE_TYPES, RESOURCE_TYPES, BRAND_PLACEMENTS } = SponsorshipOpportunity;
 const { CONTRACTED_STAGES } = SponsorshipDeal;
@@ -62,6 +65,12 @@ const notifyCampaignTeam = async (opp, senderId, title, message, link) => {
   const staff = await User.find({ role: { $in: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] } }).select('role permissions');
   const managers = staff.filter((s) => canManage(s)).map((s) => s._id);
   await notifyUsers([...managers, ...(opp.organizers || [])], senderId, title, message, link);
+};
+
+// Issued invoices (not drafts, not void) for a deal, with their net subtotal in paisa
+const billedInvoices = async (dealId) => {
+  const list = await Invoice.find({ deal: dealId, status: { $in: ['ISSUED', 'PARTIALLY_PAID', 'PAID'] } }).select('number subtotalPaisa');
+  return { list, subtotalPaisa: list.reduce((sum, i) => sum + i.subtotalPaisa, 0) };
 };
 
 const ACTIVE_STAGES = ['APPLIED', 'IN_REVIEW', 'NEGOTIATING', 'AGREED'];
@@ -440,7 +449,8 @@ const removeAccountMember = async (req, res) => {
 // GET /api/sponsorship/admin/accounts?status=  (managers, finance)
 const adminListAccounts = async (req, res) => {
   try {
-    if (!canManage(req.user) && !canFinance(req.user)) return fail(res, 403, 'Not allowed');
+    // Invoice staff need the sponsor list to bill them
+    if (!canManage(req.user) && !canFinance(req.user) && !hasPermission(req.user, 'canManageRevenue')) return fail(res, 403, 'Not allowed');
     const q = {};
     if (['PENDING', 'VERIFIED', 'REJECTED'].includes(req.query.status)) q.verificationStatus = req.query.status;
     const accs = await SponsorAccount.find(q).populate('members.user', 'name email').sort({ createdAt: -1 }).limit(500);
@@ -1017,10 +1027,17 @@ const changeDealStage = async (req, res) => {
       if (open.length) return fail(res, 409, `${open.length} deliverable(s) are not done yet: ${open.map((d) => d.title).slice(0, 3).join(', ')}`);
     }
 
+    // Leaving the agreed stages would leave invoices billing a deal that no longer exists
+    if (CONTRACTED_STAGES.includes(deal.stage) && !CONTRACTED_STAGES.includes(to)) {
+      const billed = await billedInvoices(deal._id);
+      if (billed.list.length) return fail(res, 409, `This deal has invoices (${billed.list.map((i) => i.number).join(', ')}). Void them first — paid invoices need a refund agreed with finance.`);
+    }
+
     const from = deal.stage;
     deal.stage = to;
     deal.history.push({ stage: to, note: str(req.body?.note, 500), by: req.user._id });
     await deal.save();
+    await syncDealContracted(deal, req.user);
     audit(req, `Moved ${deal.sponsor.name} deal for "${deal.opportunity.title}" ${from} → ${to}`, 'SPONSORSHIP', deal._id, str(req.body?.note, 500));
     const words = { IN_REVIEW: 'is being reviewed', NEGOTIATING: 'is in discussion', AGREED: 'is agreed — thank you!', FULFILLED: 'is complete', DECLINED: 'was not accepted', CANCELLED: 'was cancelled' };
     await notifySponsorMembers(deal.sponsor._id, req.user._id, 'Sponsorship update', `Your sponsorship of "${deal.opportunity.title}" ${words[to] || `moved to ${to}`}.`, `/sponsor/portal/deals/${deal._id}`);
@@ -1049,7 +1066,12 @@ const updateDealTerms = async (req, res) => {
     }
     if (b.isCustomQuote !== undefined) deal.isCustomQuote = !!b.isCustomQuote;
     const oldCash = deal.cashAmount;
-    if (b.cashAmount !== undefined) deal.cashAmount = int(b.cashAmount);
+    if (b.cashAmount !== undefined) {
+      const next = int(b.cashAmount);
+      const billed = await billedInvoices(deal._id);
+      if (next * 100 < billed.subtotalPaisa) return fail(res, 409, `Rs. ${(billed.subtotalPaisa / 100).toLocaleString('en-IN')} has already been invoiced (${billed.list.map((i) => i.number).join(', ')}). Void an invoice before lowering the agreed amount below that.`);
+      deal.cashAmount = next;
+    }
     if (b.inKindItems !== undefined) deal.inKindItems = parseInKind(b.inKindItems);
     if (b.agreement !== undefined) {
       const docUrl = optUrl(b.agreement?.documentUrl);
@@ -1060,6 +1082,7 @@ const updateDealTerms = async (req, res) => {
     }
     if (b.showOnPublicPage !== undefined) deal.showOnPublicPage = !!b.showOnPublicPage;
     await deal.save();
+    await syncDealContracted(deal, req.user);
     audit(req, `Updated terms for ${deal.sponsor?.name} on "${deal.opportunity.title}"${oldCash !== deal.cashAmount ? ` (cash Rs. ${oldCash} → Rs. ${deal.cashAmount})` : ''}`, 'SPONSORSHIP', deal._id);
     const fresh = await loadDeal(deal._id);
     res.json({ success: true, message: 'Terms saved', data: serializeDeal(fresh, viewerFor(fresh, req.user)) });
@@ -1168,8 +1191,13 @@ const recordPayment = async (req, res) => {
     const reference = str(req.body?.reference, 120);
     const method = pick(req.body?.method, ['BANK_TRANSFER', 'CONNECTIPS', 'KHALTI', 'ESEWA', 'CHEQUE', 'CASH', 'OTHER'], 'BANK_TRANSFER');
     if (method !== 'CASH' && !reference) return fail(res, 400, 'Add the bank or transaction reference');
+    // Once a deal is invoiced, money must be recorded against the invoice so it is never counted twice
+    const openInvoice = await Invoice.findOne({ deal: deal._id, status: { $in: ['ISSUED', 'PARTIALLY_PAID'] } }).select('number');
+    if (openInvoice) return fail(res, 409, `This deal has an open invoice (${openInvoice.number}). Record the payment on the invoice instead.`, { invoice: openInvoice._id });
     deal.payments.push({ amount, method, reference, receivedAt, note: str(req.body?.note, 300), recordedBy: req.user._id });
     await deal.save();
+    const added = deal.payments[deal.payments.length - 1];
+    await postEntry({ date: receivedAt, source: 'SPONSORSHIP', stage: 'RECEIVED', amountPaisa: amount * 100, description: `Payment from ${deal.sponsor?.name} for ${deal.opportunity.title}`, sponsorAccount: deal.sponsor?._id, deal: deal._id, payment: added._id, method, reference, createdBy: req.user._id });
     audit(req, `Recorded payment Rs. ${amount} (${method}${reference ? ` ${reference}` : ''}) from ${deal.sponsor?.name}`, 'SPONSORSHIP', deal._id);
     await notifySponsorMembers(deal.sponsor._id, req.user._id, 'Payment received', `We received Rs. ${amount.toLocaleString('en-IN')} for "${deal.opportunity.title}". Thank you!`, `/sponsor/portal/deals/${deal._id}`);
     const fresh = await loadDeal(deal._id);
@@ -1187,9 +1215,12 @@ const deletePayment = async (req, res) => {
     if (!deal) return fail(res, 404, 'Deal not found');
     const p = deal.payments.id(req.params.pid);
     if (!p) return fail(res, 404, 'Payment not found');
+    if (p.invoice) return fail(res, 409, 'This payment was recorded on an invoice. Remove it from the invoice instead.', { invoice: p.invoice });
+    const ledgerRows = await LedgerEntry.find({ deal: deal._id, payment: p._id, stage: 'RECEIVED', reversed: false, reversalOf: null });
     const desc = `Rs. ${p.amount} (${p.method}${p.reference ? ` ${p.reference}` : ''})`;
     p.deleteOne();
     await deal.save();
+    for (const e of ledgerRows) await reverseEntry(e, { user: req.user, note: str(req.body?.reason || req.query?.reason, 300) || 'Payment removed' });
     audit(req, `Removed payment ${desc} from ${deal.sponsor?.name}`, 'SPONSORSHIP', deal._id, str(req.body?.reason || req.query?.reason, 300));
     const fresh = await loadDeal(deal._id);
     res.json({ success: true, message: 'Payment removed', data: serializeDeal(fresh, viewerFor(fresh, req.user)) });

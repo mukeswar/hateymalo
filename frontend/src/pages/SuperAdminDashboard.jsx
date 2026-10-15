@@ -59,6 +59,9 @@ import {
   Landmark,
   MonitorPlay,
   LayoutTemplate,
+  TrendingUp,
+  ReceiptText,
+  ScrollText,
 } from 'lucide-react';
 
 /* --------------------------------------------------------------------------
@@ -72,6 +75,10 @@ const SponsorsTab = lazy(() => import('./admin/sponsorship/SponsorsTab'));
 // Advertising sections (contract: docs/ADS.md)
 const AdsTab = lazy(() => import('./admin/ads/AdsTab'));
 const AdPlacementsTab = lazy(() => import('./admin/ads/AdPlacementsTab'));
+// Revenue ledger and invoices (contract: docs/REVENUE.md)
+const RevenueTab = lazy(() => import('./admin/revenue/RevenueTab'));
+const InvoicesTab = lazy(() => import('./admin/revenue/InvoicesTab'));
+const LedgerTab = lazy(() => import('./admin/revenue/LedgerTab'));
 const SectionLoading = () => (
   <div className="flex items-center justify-center gap-3 py-16" role="status" aria-live="polite">
     <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-sand border-t-brand" aria-hidden="true" />
@@ -175,7 +182,7 @@ const FeatureButton = ({ featured, onClick }) => (
 // Finance permissions are grouped separately because they expose donor data.
 const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
   if (!catalog) return <p className="text-sm text-muted">Loading permissions…</p>;
-  const finance = ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'];
+  const finance = ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance', 'canManageRevenue'];
   const sponsorship = ['canManageSponsorships', 'canManageBrandKits'];
   const advertising = ['canManageAds', 'canReviewAds'];
   const toggle = (key, on) => onChange(on ? [...new Set([...value, key])] : value.filter((k) => k !== key));
@@ -293,6 +300,10 @@ const SuperAdminDashboard = () => {
     // Advertising: reviewers edit placements; managers and finance may read them
     ads: ['canManageAds', 'canReviewAds', 'canManageSponsorFinance'],
     adPlacements: ['canReviewAds', 'canManageAds', 'canManageSponsorFinance'],
+    // Revenue: totals for anyone running sponsorship or ads; invoices and ledger for finance
+    revenue: ['canManageRevenue', 'canManageSponsorFinance', 'canManageSponsorships', 'canManageAds', 'canReviewAds'],
+    invoices: 'canManageRevenue',
+    ledger: 'canManageRevenue',
     admins: 'super',
     settings: 'super',
     logs: 'super',
@@ -319,6 +330,8 @@ const SuperAdminDashboard = () => {
   const [dealFocus, setDealFocus] = useState(null);
   // { campaign, nonce } — opens an ad campaign in the Advertising tab
   const [adFocus, setAdFocus] = useState(null);
+  // { invoice?, overdue?, nonce } — opens an invoice / filters the Invoices tab
+  const [invoiceFocus, setInvoiceFocus] = useState(null);
   // Mobile navigation drawer (the sidebar is always visible from lg up)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -586,7 +599,8 @@ const SuperAdminDashboard = () => {
     const tab = searchParams.get('tab');
     const deal = searchParams.get('deal');
     const campaign = searchParams.get('campaign');
-    if (!tab && !deal && !campaign) return;
+    const invoice = searchParams.get('invoice');
+    if (!tab && !deal && !campaign && !invoice) return;
     if (tab && canTab(tab)) handleTabChange(tab);
     if (deal && canTab('sponsorDeals')) {
       if (tab !== 'sponsorDeals') handleTabChange('sponsorDeals');
@@ -596,6 +610,11 @@ const SuperAdminDashboard = () => {
     if (campaign && canTab('ads')) {
       if (tab !== 'ads') handleTabChange('ads');
       setAdFocus({ campaign, nonce: Date.now() });
+    }
+    // /admin?tab=invoices&invoice=<id> (deal drawer, print view)
+    if (invoice && canTab('invoices')) {
+      if (tab !== 'invoices') handleTabChange('invoices');
+      setInvoiceFocus({ invoice, nonce: Date.now() });
     }
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1114,6 +1133,14 @@ const SuperAdminDashboard = () => {
       items: [
         { id: 'ads', label: 'Ad campaigns', icon: MonitorPlay },
         { id: 'adPlacements', label: 'Placements & rates', icon: LayoutTemplate },
+      ],
+    },
+    {
+      label: 'Revenue',
+      items: [
+        { id: 'revenue', label: 'Revenue overview', icon: TrendingUp },
+        { id: 'invoices', label: 'Invoices', icon: ReceiptText },
+        { id: 'ledger', label: 'Ledger', icon: ScrollText },
       ],
     },
     {
@@ -2202,6 +2229,17 @@ const SuperAdminDashboard = () => {
             <AdsTab focus={adFocus} onFocusHandled={() => setAdFocus(null)} search={searchQuery} refreshKey={sponsorRefresh} />
           )}
           {activeTab === 'adPlacements' && <AdPlacementsTab refreshKey={sponsorRefresh} />}
+          {/* REVENUE (components live in pages/admin/revenue) */}
+          {activeTab === 'revenue' && (
+            <RevenueTab
+              refreshKey={sponsorRefresh}
+              onOpenInvoices={canTab('invoices') ? (focus) => { setInvoiceFocus({ ...focus, nonce: Date.now() }); handleTabChange('invoices'); } : undefined}
+            />
+          )}
+          {activeTab === 'invoices' && (
+            <InvoicesTab focus={invoiceFocus} onFocusHandled={() => setInvoiceFocus(null)} search={searchQuery} refreshKey={sponsorRefresh} />
+          )}
+          {activeTab === 'ledger' && <LedgerTab search={searchQuery} refreshKey={sponsorRefresh} />}
           </Suspense>
 
           {/* ========================================================================= */}
@@ -2247,7 +2285,7 @@ const SuperAdminDashboard = () => {
                             {(admin.permissions?.length ? admin.permissions : presetFor(admin.role)).map((p) => (
                               <span
                                 key={p}
-                                className={`chip ${['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'].includes(p) ? 'bg-marigold-tint text-marigold-text' : 'bg-paper-deep text-ink-soft'}`}
+                                className={`chip ${['canViewDonations', 'canManageDonations', 'canManageSponsorFinance', 'canManageRevenue'].includes(p) ? 'bg-marigold-tint text-marigold-text' : 'bg-paper-deep text-ink-soft'}`}
                               >
                                 {permissionLabel(p)}
                               </span>

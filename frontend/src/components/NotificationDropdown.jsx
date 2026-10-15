@@ -13,6 +13,7 @@ import {
   Megaphone,
   CheckCheck,
   Handshake,
+  ReceiptText,
 } from 'lucide-react';
 
 const NotificationDropdown = () => {
@@ -123,6 +124,8 @@ const NotificationDropdown = () => {
         return { Icon: Handshake, cls: 'bg-marigold-tint text-marigold-text' };
       case 'ADVERTISING':
         return { Icon: Megaphone, cls: 'bg-sky-tint text-sky-ink' };
+      case 'BILLING':
+        return { Icon: ReceiptText, cls: 'bg-pine-tint text-pine' };
       case 'WARNING':
         return { Icon: AlertTriangle, cls: 'bg-marigold-tint text-marigold-text' };
       default:

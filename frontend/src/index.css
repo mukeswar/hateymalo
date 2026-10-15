@@ -352,3 +352,27 @@
   .reveal { opacity: 1; transform: none; }
   .tilt { transform: none !important; }
 }
+
+/* Invoice print view (/invoices/:id/print): A4, no site chrome, true colours */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .invoice-sheet {
+    max-width: none !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .invoice-sheet table {
+    min-width: 0 !important;
+  }
+  .invoice-sheet tr {
+    break-inside: avoid;
+  }
+}

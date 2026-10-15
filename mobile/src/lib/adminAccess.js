@@ -48,6 +48,14 @@ export const ADMIN_GROUPS = [
     ],
   },
   {
+    label: 'Revenue',
+    items: [
+      { id: 'revenue', label: 'Revenue', icon: 'TrendingUp', need: ['canManageRevenue', 'canManageSponsorFinance', 'canManageSponsorships', 'canManageAds', 'canReviewAds'] },
+      { id: 'invoices', label: 'Invoices', icon: 'ReceiptText', need: 'canManageRevenue' },
+      { id: 'ledger', label: 'Revenue ledger', icon: 'BookOpenText', need: 'canManageRevenue' },
+    ],
+  },
+  {
     label: 'System',
     items: [
       { id: 'admins', label: 'Admins & roles', icon: 'ShieldAlert', need: 'super' },

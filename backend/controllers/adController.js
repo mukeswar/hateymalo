@@ -11,6 +11,8 @@ const { isStaff } = require('../utils/roles');
 const { createAuditLog } = require('../utils/auditLogger');
 const { getSettings } = require('../utils/settingsCache');
 const { issueAdToken, readAdToken } = require('../utils/adToken');
+const { spendOf, bookedValueOf, budgetSpent } = require('../utils/adMoney');
+const { syncCampaignContracted } = require('../utils/ledger');
 
 const { PRICING_MODELS, OBJECTIVES, LABELS, CTAS } = AdCampaign;
 const { AD_FORMATS, SURFACES } = AdPlacement;
@@ -93,16 +95,6 @@ const sweepEnded = async () => {
 
 /* ---------------------------- money ------------------------------- */
 
-// Earned to date, whole NPR, from valid-traffic totals
-const spendOf = (c) => {
-  const t = c.totals || {};
-  if (c.pricingModel === 'FLAT') return c.startDate && new Date(c.startDate) <= new Date() && ['APPROVED', 'PAUSED', 'ENDED', 'ARCHIVED'].includes(c.status) ? c.flatPrice || 0 : 0;
-  const raw = c.pricingModel === 'CPM' ? Math.floor(((t.impressions || 0) * (c.rate || 0)) / 1000) : (t.clicks || 0) * (c.rate || 0);
-  return c.budget > 0 ? Math.min(raw, c.budget) : raw;
-};
-// What the advertiser has committed to pay for the whole run
-const bookedValueOf = (c) => (c.pricingModel === 'FLAT' ? c.flatPrice || 0 : c.budget || 0);
-const budgetSpent = (c) => c.pricingModel !== 'FLAT' && c.budget > 0 && spendOf(c) >= c.budget;
 
 // Whole days between start and end (a 1 Oct → 11 Oct booking is 10 days)
 const campaignDays = (start, end) => Math.max(1, Math.round((new Date(end) - new Date(start)) / DAY_MS));
@@ -594,6 +586,7 @@ const updateCampaign = async (req, res) => {
       c.history.push({ status: 'IN_REVIEW', note: 'Changed after approval — waiting for review again', by: req.user._id });
     }
     await c.save();
+    await syncCampaignContracted(c, req.user);
     if (!memberRole(c.advertiser, req.user)) audit(req, `Updated ad campaign "${c.title}"${priceChanged ? ' (pricing changed)' : ''}`, c._id);
     if (backToReview) notifyReviewers(req.user._id, 'Ad changed — review again', `"${c.title}" by ${c.advertiser.name} was changed after approval.`, `/admin?tab=ads&campaign=${c._id}`).catch(() => {});
     const fresh = await loadCampaign(c._id);
@@ -668,6 +661,7 @@ const changeCampaignStatus = async (req, res) => {
     const done = { PAUSE: 'Paused', RESUME: 'Resumed', END: 'Ended', ARCHIVE: 'Archived', WITHDRAW: 'Withdrawn from review' }[action];
     c.history.push({ status: move.to, note: note || done, by: req.user._id });
     await c.save();
+    await syncCampaignContracted(c, req.user);
     if (byStaff) {
       audit(req, `${done} ad campaign "${c.title}"`, c._id, note);
       notifyAdvertiser(c.advertiser._id, req.user._id, `Ad campaign ${move.to.toLowerCase()}`, `Our team set "${c.title}" to ${move.to.toLowerCase()}.${note ? ` ${note}` : ''}`, `/sponsor/ads/${c._id}`).catch(() => {});
@@ -832,6 +826,7 @@ const reviewCampaign = async (req, res) => {
     c.reviewedAt = new Date();
     c.history.push({ status: c.status, note: reason || (decision === 'APPROVE' ? 'Approved' : ''), by: req.user._id });
     await c.save();
+    await syncCampaignContracted(c, req.user);
     audit(req, `${decision === 'APPROVE' ? 'Approved' : 'Rejected'} ad campaign "${c.title}"`, c._id, reason);
     notifyAdvertiser(
       c.advertiser._id,
