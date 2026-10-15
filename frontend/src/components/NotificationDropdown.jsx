@@ -63,7 +63,7 @@ const NotificationDropdown = () => {
 
   // Resolve where a notification should link, based on which entity it references.
   const getDestination = (n) => {
-    // Sponsorship (and any future) notifications carry an in-app path
+    // Sponsorship, advertising (and any future) notifications carry an in-app path
     if (typeof n.link === 'string' && n.link.startsWith('/') && !n.link.startsWith('//')) return n.link;
     const blogId = n.blog?._id || n.blog;
     const eventId = n.event?._id || n.event;
@@ -121,6 +121,8 @@ const NotificationDropdown = () => {
         return { Icon: Megaphone, cls: 'bg-marigold-tint text-marigold-text' };
       case 'SPONSORSHIP':
         return { Icon: Handshake, cls: 'bg-marigold-tint text-marigold-text' };
+      case 'ADVERTISING':
+        return { Icon: Megaphone, cls: 'bg-sky-tint text-sky-ink' };
       case 'WARNING':
         return { Icon: AlertTriangle, cls: 'bg-marigold-tint text-marigold-text' };
       default:

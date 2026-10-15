@@ -7,6 +7,7 @@ import Avatar from '../components/ui/Avatar';
 import { Reveal, Tilt, CountUp, useParallax } from '../components/ui/motion';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import AdSlot from '../components/ads/AdSlot';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -381,6 +382,9 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* ============ SPONSORED (renders nothing when no ad is served) ============ */}
+      <AdSlot placement="home.banner" layout="wide" className="container-page pt-14 lg:pt-16" />
 
       {/* ============ OPEN REQUESTS ============ */}
       <section className="container-page py-20 lg:py-28">

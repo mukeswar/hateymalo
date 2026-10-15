@@ -16,7 +16,7 @@ import {
   dateRange,
   errMsg,
 } from '../../components/sponsorship/shared';
-import { ArrowRight, Briefcase, Building2, ChevronRight, FileText, Plus, Search, Users } from 'lucide-react';
+import { ArrowRight, Briefcase, Building2, ChevronRight, FileText, Megaphone, Plus, Search, Users } from 'lucide-react';
 
 const GROUPS = [
   { key: 'action', title: 'In progress', stages: ['APPLIED', 'IN_REVIEW', 'NEGOTIATING'], empty: 'No proposals waiting on a decision.' },
@@ -105,6 +105,7 @@ const SponsorPortal = () => {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/sponsor#opportunities" className="btn btn-primary"><Search className="w-4 h-4" aria-hidden="true" /> Find a campaign</Link>
+            <Link to="/sponsor/ads" className="btn btn-ghost"><Megaphone className="w-4 h-4" aria-hidden="true" /> Ad campaigns</Link>
             <button type="button" onClick={() => setCreateOpen(true)} className="btn btn-ghost"><Plus className="w-4 h-4" aria-hidden="true" /> Register organisation</button>
           </div>
         </div>
@@ -153,6 +154,16 @@ const SponsorPortal = () => {
               <Users className="w-5 h-5 text-pine shrink-0" aria-hidden="true" />
               <span>Owners can add colleagues as editors (can apply and approve logos) or viewers (read-only).</span>
             </div>
+            {accounts.length > 0 && (
+              <Link to="/sponsor/ads" className="card card-hover p-4 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-sky-tint text-sky-ink flex items-center justify-center shrink-0"><Megaphone className="w-5 h-5" aria-hidden="true" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-ink">Ad campaigns</span>
+                  <span className="block text-xs text-muted">Run labelled sponsored ads on the website and app, with measured reports.</span>
+                </span>
+                <ChevronRight className="w-5 h-5 text-muted shrink-0" aria-hidden="true" />
+              </Link>
+            )}
           </section>
 
           {/* Deals */}

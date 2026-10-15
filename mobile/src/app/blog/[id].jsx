@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { colors, fonts, radius, space } from '../../theme';
 import { T, Avatar, Button, Divider, Row, Screen, Skeleton, EmptyState } from '../../components/ui';
 import CommentSection from '../../components/CommentSection';
+import AdSlot from '../../components/ads/AdSlot';
 import { BlogCover, readMinutes } from '../../components/blogs/BlogBits';
 import StoryBody from '../../components/blogs/StoryBody';
 import { publicLink, shareLink } from '../../components/blogs/share';
@@ -190,6 +191,8 @@ export default function BlogDetailsScreen() {
         </View>
       ) : null}
 
+      {/* Sponsored (content.footer) — renders nothing when there is no ad */}
+      <AdSlot placement="content.footer" category={category || ''} />
       <CommentSection postId={id} />
     </Screen>
   );

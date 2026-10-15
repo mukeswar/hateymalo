@@ -43,6 +43,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import PostCard from '../../components/PostCard';
 import { Avatar, Button, Card, Chip, ProgressBar, Row, Skeleton, T, VerificationBadge } from '../../components/ui';
+import AdSlot from '../../components/ads/AdSlot';
 import { colors, fonts, radius, shadow, space } from '../../theme';
 
 // Port of frontend/src/pages/Home.jsx. Decorative web motion (parallax, tilt,
@@ -396,6 +397,9 @@ export default function HomeScreen() {
             </Pressable>
           ))}
         </ScrollView>
+
+        {/* Sponsored banner (renders nothing when there is no ad) */}
+        <AdSlot placement="home.banner" style={{ paddingHorizontal: space.lg }} />
 
         {/* Ways to take part */}
         <Section

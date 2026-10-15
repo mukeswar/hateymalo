@@ -22,6 +22,7 @@ const FEATURES = [
   { key: 'allowPublicComments', title: 'Allow public comments', hint: 'Members can comment on help requests, events and stories.' },
   { key: 'allowRegistrations', title: 'Allow new member registrations', hint: 'Turn off to pause new sign-ups (existing members can still log in).' },
   { key: 'requireOrgVerification', title: 'Require verification for organisations', hint: 'Organisations get the verified badge only after the team checks their details.' },
+  { key: 'adsEnabled', title: 'Show sponsored ads', hint: 'Master switch for advertising on the website and the app. When off, no ad slots are shown anywhere.' },
 ];
 
 const Group = ({ title, icon: Icon, children, hint }) => (

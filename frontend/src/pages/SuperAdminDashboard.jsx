@@ -57,6 +57,8 @@ import {
   Globe,
   Handshake,
   Landmark,
+  MonitorPlay,
+  LayoutTemplate,
 } from 'lucide-react';
 
 /* --------------------------------------------------------------------------
@@ -67,6 +69,9 @@ import {
 const OpportunitiesTab = lazy(() => import('./admin/sponsorship/OpportunitiesTab'));
 const DealsTab = lazy(() => import('./admin/sponsorship/DealsTab'));
 const SponsorsTab = lazy(() => import('./admin/sponsorship/SponsorsTab'));
+// Advertising sections (contract: docs/ADS.md)
+const AdsTab = lazy(() => import('./admin/ads/AdsTab'));
+const AdPlacementsTab = lazy(() => import('./admin/ads/AdPlacementsTab'));
 const SectionLoading = () => (
   <div className="flex items-center justify-center gap-3 py-16" role="status" aria-live="polite">
     <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-sand border-t-brand" aria-hidden="true" />
@@ -172,6 +177,7 @@ const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
   if (!catalog) return <p className="text-sm text-muted">Loading permissions…</p>;
   const finance = ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'];
   const sponsorship = ['canManageSponsorships', 'canManageBrandKits'];
+  const advertising = ['canManageAds', 'canReviewAds'];
   const toggle = (key, on) => onChange(on ? [...new Set([...value, key])] : value.filter((k) => k !== key));
   const group = (title, items, warn) => (
     <fieldset className="space-y-2">
@@ -196,8 +202,9 @@ const AccessChecklist = ({ catalog, value, onChange, idPrefix }) => {
   );
   return (
     <div className="space-y-4">
-      {group('Moderation & community', catalog.permissions.filter((p) => !finance.includes(p.key) && !sponsorship.includes(p.key)))}
+      {group('Moderation & community', catalog.permissions.filter((p) => !finance.includes(p.key) && !sponsorship.includes(p.key) && !advertising.includes(p.key)))}
       {group('Sponsorship', catalog.permissions.filter((p) => sponsorship.includes(p.key)))}
+      {group('Advertising', catalog.permissions.filter((p) => advertising.includes(p.key)))}
       {group('Finance (confidential)', catalog.permissions.filter((p) => finance.includes(p.key)), 'Only grant to people you trust with donor and sponsor names, amounts and transaction IDs.')}
       <p className="text-xs text-muted">Settings, staff management, roles and the activity log always stay with the Super Admin.</p>
     </div>
@@ -283,6 +290,9 @@ const SuperAdminDashboard = () => {
     sponsorship: 'canManageSponsorships',
     sponsorDeals: ['canManageSponsorships', 'canManageSponsorFinance', 'canManageBrandKits'],
     sponsors: ['canManageSponsorships', 'canManageSponsorFinance'],
+    // Advertising: reviewers edit placements; managers and finance may read them
+    ads: ['canManageAds', 'canReviewAds', 'canManageSponsorFinance'],
+    adPlacements: ['canReviewAds', 'canManageAds', 'canManageSponsorFinance'],
     admins: 'super',
     settings: 'super',
     logs: 'super',
@@ -307,6 +317,8 @@ const SuperAdminDashboard = () => {
   const [sponsorRefresh, setSponsorRefresh] = useState(0);
   // { deal?, opportunity?, sponsor?, nonce } — opens / filters the deals pipeline
   const [dealFocus, setDealFocus] = useState(null);
+  // { campaign, nonce } — opens an ad campaign in the Advertising tab
+  const [adFocus, setAdFocus] = useState(null);
   // Mobile navigation drawer (the sidebar is always visible from lg up)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -546,7 +558,8 @@ const SuperAdminDashboard = () => {
 
     const interval = setInterval(() => {
       fetchDashboardData();
-      fetchTabData(activeTab);
+      // The settings form is not re-polled: it would overwrite unsaved edits every 8 seconds
+      if (activeTab !== 'settings') fetchTabData(activeTab);
     }, 8000);
 
     return () => clearInterval(interval);
@@ -572,11 +585,17 @@ const SuperAdminDashboard = () => {
   useEffect(() => {
     const tab = searchParams.get('tab');
     const deal = searchParams.get('deal');
-    if (!tab && !deal) return;
+    const campaign = searchParams.get('campaign');
+    if (!tab && !deal && !campaign) return;
     if (tab && canTab(tab)) handleTabChange(tab);
     if (deal && canTab('sponsorDeals')) {
       if (tab !== 'sponsorDeals') handleTabChange('sponsorDeals');
       setDealFocus({ deal, nonce: Date.now() });
+    }
+    // /admin?tab=ads&campaign=<id> (ad review notifications)
+    if (campaign && canTab('ads')) {
+      if (tab !== 'ads') handleTabChange('ads');
+      setAdFocus({ campaign, nonce: Date.now() });
     }
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1088,6 +1107,13 @@ const SuperAdminDashboard = () => {
         { id: 'sponsorship', label: 'Opportunities & tiers', icon: Landmark },
         { id: 'sponsorDeals', label: 'Sponsor deals', icon: Handshake },
         { id: 'sponsors', label: 'Sponsor accounts', icon: Building2 },
+      ],
+    },
+    {
+      label: 'Advertising',
+      items: [
+        { id: 'ads', label: 'Ad campaigns', icon: MonitorPlay },
+        { id: 'adPlacements', label: 'Placements & rates', icon: LayoutTemplate },
       ],
     },
     {
@@ -2171,6 +2197,11 @@ const SuperAdminDashboard = () => {
               onViewDeals={canTab('sponsorDeals') ? (sponsor) => openDealsFor({ sponsor }) : undefined}
             />
           )}
+          {/* ADVERTISING (components live in pages/admin/ads) */}
+          {activeTab === 'ads' && (
+            <AdsTab focus={adFocus} onFocusHandled={() => setAdFocus(null)} search={searchQuery} refreshKey={sponsorRefresh} />
+          )}
+          {activeTab === 'adPlacements' && <AdPlacementsTab refreshKey={sponsorRefresh} />}
           </Suspense>
 
           {/* ========================================================================= */}
@@ -2379,6 +2410,7 @@ const SuperAdminDashboard = () => {
                       { key: 'allowPublicComments', title: 'Allow public comments', hint: 'Members can comment on help requests, events and stories.' },
                       { key: 'allowRegistrations', title: 'Allow new member registrations', hint: 'Turn off to pause new sign-ups (existing members can still log in).' },
                       { key: 'requireOrgVerification', title: 'Require verification for organisations', hint: 'Organisations get the verified badge only after the team checks their details.' },
+                      { key: 'adsEnabled', title: 'Show sponsored ads', hint: 'Master switch for labelled sponsored ads on the website and in the app. Turn off to stop every ad slot at once (campaigns keep their status).' },
                     ].map(({ key, title, hint }) => (
                       <label key={key} htmlFor={`set-${key}`} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-sand p-4 hover:bg-paper">
                         <input

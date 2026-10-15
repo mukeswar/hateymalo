@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import API from '../services/api';
 import PostCard from '../components/PostCard';
+import AdSlot from '../components/ads/AdSlot';
 import { Search, MapPin, RotateCcw, SlidersHorizontal, X, HandHeart, PlusCircle } from 'lucide-react';
 
 const FALLBACK_CATEGORY_OPTIONS = [
@@ -255,9 +256,13 @@ const ExplorePosts = () => {
         ) : posts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {posts.map((post, i) => (
-              <div key={post._id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
-                <PostCard post={post} />
-              </div>
+              <React.Fragment key={post._id}>
+                <div className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
+                  <PostCard post={post} />
+                </div>
+                {/* Sponsored card after every 6th request (nothing when no ad is served) */}
+                {(i + 1) % 6 === 0 && <AdSlot placement="feed.inline" layout="card" category={category} className="h-full" />}
+              </React.Fragment>
             ))}
           </div>
         ) : (

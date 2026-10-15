@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import RejectionModal from '../components/RejectionModal';
 import CommentSection from '../components/CommentSection';
 import PostUpdatesSection from '../components/PostUpdatesSection';
+import AdSlot from '../components/ads/AdSlot';
 import ReportModal from '../components/ReportModal';
 import VerificationBadge from '../components/VerificationBadge';
 import Avatar from '../components/ui/Avatar';
@@ -571,6 +572,9 @@ const PostDetails = () => {
 
             {/* Post Updates Section */}
             <PostUpdatesSection postId={id} isCreator={isCreator} />
+
+            {/* Sponsored, below the main content (nothing when no ad is served) */}
+            <AdSlot placement="content.footer" layout="wide" category={category} />
 
             {/* Threaded Comments Section */}
             <CommentSection postId={id} />

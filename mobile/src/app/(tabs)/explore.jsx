@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { HandHeart, MapPin, Plus, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import API from '../../lib/api';
 import PostCard from '../../components/PostCard';
+import { AdCreative, interleaveAds, useAds } from '../../components/ads/AdSlot';
 import { Button, Card, ChipBar, EmptyState, Field, Row, Screen, Segmented, Skeleton, T } from '../../components/ui';
 import { colors, fonts, radius, shadow, space } from '../../theme';
 
@@ -139,6 +140,9 @@ export default function ExploreScreen() {
 
   const hasActiveFilters = !!search || !!location || category !== 'All' || sort !== 'newest' || status !== 'APPROVED';
   const shown = useMemo(() => posts.slice(0, visible), [posts, visible]);
+  // Sponsored cards after every 6th post (feed.inline), matched to the active cause.
+  const { ads: feedAds, placement: feedPlacement } = useAds('feed.inline', { category: category === 'All' ? '' : category });
+  const rows = useMemo(() => interleaveAds(shown, feedAds, 6), [shown, feedAds]);
 
   const header = (
     <View style={{ gap: space.md, paddingBottom: space.sm }}>
@@ -233,9 +237,13 @@ export default function ExploreScreen() {
   return (
     <Screen scroll={false} edges={[]}>
       <FlatList
-        data={loading ? [] : shown}
+        data={loading ? [] : rows}
         keyExtractor={(p) => p._id}
-        renderItem={({ item }) => <View style={{ paddingHorizontal: space.lg }}><PostCard post={item} /></View>}
+        renderItem={({ item }) => (
+          <View style={{ paddingHorizontal: space.lg }}>
+            {item.__ad ? <AdCreative ad={item.__ad} placementInfo={feedPlacement} /> : <PostCard post={item} />}
+          </View>
+        )}
         ItemSeparatorComponent={() => <View style={{ height: space.lg }} />}
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"

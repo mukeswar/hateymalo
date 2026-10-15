@@ -36,6 +36,11 @@ const SponsorDeal = lazy(() => import('./pages/sponsorship/SponsorDeal'));
 const SponsorAccount = lazy(() => import('./pages/sponsorship/SponsorAccount'));
 const OrganizerWorkspace = lazy(() => import('./pages/sponsorship/OrganizerWorkspace'));
 
+// Advertising (sponsor accounts run ad campaigns; contract docs/ADS.md)
+const AdCampaigns = lazy(() => import('./pages/sponsorship/AdCampaigns'));
+const AdCampaign = lazy(() => import('./pages/sponsorship/AdCampaign'));
+const AdCampaignEditor = lazy(() => import('./pages/sponsorship/AdCampaignEditor'));
+
 // Master Admin Dashboards
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -93,6 +98,12 @@ function App() {
           <Route path="/sponsor/portal/deals/:id" element={<ProtectedRoute><SponsorDeal /></ProtectedRoute>} />
           <Route path="/sponsor/portal/accounts/:id" element={<ProtectedRoute><SponsorAccount /></ProtectedRoute>} />
           <Route path="/organize/:id" element={<ProtectedRoute><OrganizerWorkspace /></ProtectedRoute>} />
+
+          {/* Advertising (notifications link to /sponsor/ads/:id) */}
+          <Route path="/sponsor/ads" element={<ProtectedRoute><AdCampaigns /></ProtectedRoute>} />
+          <Route path="/sponsor/ads/new" element={<ProtectedRoute><AdCampaignEditor /></ProtectedRoute>} />
+          <Route path="/sponsor/ads/:id" element={<ProtectedRoute><AdCampaign /></ProtectedRoute>} />
+          <Route path="/sponsor/ads/:id/edit" element={<ProtectedRoute><AdCampaignEditor /></ProtectedRoute>} />
 
           {/* User Protected Routes */}
           <Route

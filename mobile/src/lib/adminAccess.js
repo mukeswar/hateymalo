@@ -41,6 +41,13 @@ export const ADMIN_GROUPS = [
     ],
   },
   {
+    label: 'Advertising',
+    items: [
+      { id: 'ads', label: 'Ad campaigns', icon: 'Megaphone', need: ['canManageAds', 'canReviewAds', 'canManageSponsorFinance'] },
+      { id: 'adPlacements', label: 'Placements & rate cards', icon: 'LayoutTemplate', need: 'canReviewAds' },
+    ],
+  },
+  {
     label: 'System',
     items: [
       { id: 'admins', label: 'Admins & roles', icon: 'ShieldAlert', need: 'super' },

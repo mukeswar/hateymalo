@@ -19,7 +19,9 @@ const PERMISSIONS = [
   { key: 'canManageDonations', label: 'Manage finances', hint: 'Launch or delete campaigns and add or delete expenses.' },
   { key: 'canManageSponsorships', label: 'Manage sponsorships', hint: 'Create sponsorship opportunities and tiers, review and agree sponsor deals, track deliverables.' },
   { key: 'canManageBrandKits', label: 'Manage brand kits', hint: 'Arrange sponsor logos on vests, banners and ID cards and export print artwork.' },
-  { key: 'canManageSponsorFinance', label: 'Sponsorship payments', hint: 'Record and remove sponsor payments and see received amounts.' },
+  { key: 'canManageSponsorFinance', label: 'Sponsorship payments', hint: 'Record and remove sponsor payments and see received amounts, and read ad revenue and reports.' },
+  { key: 'canManageAds', label: 'Manage ad campaigns', hint: 'Create and edit ad campaigns for advertisers, set custom prices and read ad reports.' },
+  { key: 'canReviewAds', label: 'Review ads & placements', hint: 'Approve, reject and pause ads, and manage ad placements and rate cards.' },
 ];
 
 const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
@@ -28,7 +30,7 @@ const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 // (Campaign Manager, Media Team, Finance Team). Like role presets, finance
 // keys are only ever in the Finance Team template.
 const STAFF_TEMPLATES = {
-  CAMPAIGN_MANAGER: { label: 'Campaign Manager', permissions: ['canManageSponsorships', 'canManageBrandKits', 'canManageEvents'] },
+  CAMPAIGN_MANAGER: { label: 'Campaign Manager', permissions: ['canManageSponsorships', 'canManageBrandKits', 'canManageEvents', 'canManageAds'] },
   MEDIA_TEAM: { label: 'Media Team', permissions: ['canManageBrandKits'] },
   FINANCE_TEAM: { label: 'Finance Team', permissions: ['canViewDonations', 'canManageDonations', 'canManageSponsorFinance'] },
 };
@@ -46,6 +48,8 @@ const ROLE_PRESETS = {
     'canManageOrganizations',
     'canManageSponsorships',
     'canManageBrandKits',
+    'canManageAds',
+    'canReviewAds',
   ],
 };
 

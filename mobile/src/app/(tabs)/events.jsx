@@ -3,6 +3,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { ArrowRight, CalendarDays, CalendarX2, Clock, MapPin, Sparkles } from 'lucide-react-native';
 import API from '../../lib/api';
+import AdSlot from '../../components/ads/AdSlot';
 import { colors, fonts, space } from '../../theme';
 import { T, Card, ChipBar, Screen, Skeleton, Button, Divider, Row } from '../../components/ui';
 import {
@@ -163,6 +164,8 @@ export default function EventsScreen() {
         </T>
       </View>
       <ChipBar options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} style={{ paddingHorizontal: 0 }} />
+      {/* Sponsored card at the top of the list (events.list); nothing when there is no ad */}
+      <AdSlot placement="events.list" />
       {!loading && spotlight ? <FeaturedEvent event={spotlight} /> : null}
     </View>
   );

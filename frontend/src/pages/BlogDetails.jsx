@@ -4,6 +4,7 @@ import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import CommentSection from '../components/CommentSection';
+import AdSlot from '../components/ads/AdSlot';
 import Avatar from '../components/ui/Avatar';
 import { Reveal } from '../components/ui/motion';
 import { BookOpen, Eye, Heart, Share2, ArrowLeft, Check, PenLine } from 'lucide-react';
@@ -195,6 +196,9 @@ const BlogDetails = () => {
               </Link>
             </Reveal>
           )}
+
+          {/* Sponsored, below the story (nothing when no ad is served) */}
+          <AdSlot placement="content.footer" layout="wide" category={category} className="mt-12" />
 
           {/* Discussion */}
           <div className="mt-12">

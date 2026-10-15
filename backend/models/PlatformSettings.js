@@ -73,6 +73,11 @@ const platformSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Master switch for sponsored ads on the website and app
+    adsEnabled: {
+      type: Boolean,
+      default: true,
+    },
 
     // Moderation & Safety Settings
     prohibitedWords: {

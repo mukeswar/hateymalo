@@ -47,6 +47,7 @@ import {
   VerificationBadge,
 } from '../../components/ui';
 import CommentSection from '../../components/CommentSection';
+import AdSlot from '../../components/ads/AdSlot';
 import PostUpdatesSection from '../../components/PostUpdatesSection';
 import ReportModal from '../../components/ReportModal';
 import RejectionModal from '../../components/RejectionModal';
@@ -599,6 +600,8 @@ export default function PostDetailsScreen() {
       </Card>
 
       <PostUpdatesSection postId={id} isCreator={isCreator} />
+      {/* Sponsored (content.footer) — renders nothing when there is no ad */}
+      <AdSlot placement="content.footer" category={category || ''} />
       <CommentSection postId={id} />
 
       <Button title="Back" icon={ArrowLeft} variant="text" style={{ alignSelf: 'center' }} onPress={() => (router.canGoBack() ? router.back() : router.replace('/explore'))} />

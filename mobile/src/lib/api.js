@@ -22,6 +22,8 @@ const API = axios.create({ baseURL: API_URL, timeout: 20000 });
 API.interceptors.request.use(async (config) => {
   const token = await storage.get(TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Native fetch may send no User-Agent; the ad tracker would otherwise treat it as a bot
+  config.headers['X-Hateymalo-Client'] = 'app';
   return config;
 });
 

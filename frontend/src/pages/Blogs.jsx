@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import API from '../services/api';
 import Avatar from '../components/ui/Avatar';
 import { Reveal } from '../components/ui/motion';
+import AdSlot from '../components/ads/AdSlot';
 import { BookOpen, Eye, Heart, PenLine, Sparkles, ArrowRight, Search, Clock } from 'lucide-react';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1200&q=70';
@@ -229,9 +230,13 @@ const Blogs = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {rest.map((blog, i) => (
-                    <Reveal key={blog._id} delay={(i % 3) * 80} className="h-full">
-                      <StoryCard blog={blog} />
-                    </Reveal>
+                    <React.Fragment key={blog._id}>
+                      <Reveal delay={(i % 3) * 80} className="h-full">
+                        <StoryCard blog={blog} />
+                      </Reveal>
+                      {/* Sponsored card after every 6th story, counting the lead story (nothing when no ad is served) */}
+                      {(i + 2) % 6 === 0 && <AdSlot placement="feed.inline" layout="card" category={category} className="h-full" />}
+                    </React.Fragment>
                   ))}
                 </div>
               </section>

@@ -14,6 +14,7 @@ import {
   Globe,
   HandCoins,
   ImageOff,
+  LayoutTemplate,
   Lock,
   LogOut,
   Megaphone,
@@ -51,6 +52,7 @@ const ICONS = {
   ShieldAlert,
   Settings,
   Lock,
+  LayoutTemplate,
 };
 
 const CHART_COLORS = ['#B5232C', '#1E5A47', '#E9A23B', '#2F5D8A', '#6B6157', '#8E1A22'];

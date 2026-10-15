@@ -23,6 +23,7 @@ import { useToast } from '../../context/ToastContext';
 import { colors, fonts, radius, space } from '../../theme';
 import { T, Avatar, Button, Card, Divider, ProgressBar, Row, Screen, Skeleton, EmptyState } from '../../components/ui';
 import CommentSection from '../../components/CommentSection';
+import AdSlot from '../../components/ads/AdSlot';
 import { EventCover, EventStatusChip, OverlayChip } from '../../components/events/EventBits';
 import { publicLink, shareLink } from '../../components/blogs/share';
 
@@ -387,6 +388,9 @@ export default function EventDetailsScreen() {
           </T>
         )}
       </Card>
+
+      {/* Sponsored (content.footer) — renders nothing when there is no ad */}
+      <AdSlot placement="content.footer" category={category || ''} />
 
       {/* Discussion */}
       <CommentSection postId={id} />

@@ -358,6 +358,7 @@ const updatePlatformSettings = async (req, res) => {
       allowPublicDonations,
       allowPublicComments,
       allowRegistrations,
+      adsEnabled,
       prohibitedWords,
       maxPostsPerDay,
       maxCommentsPerHour,
@@ -381,6 +382,7 @@ const updatePlatformSettings = async (req, res) => {
     if (typeof allowPublicDonations === 'boolean') settings.allowPublicDonations = allowPublicDonations;
     if (typeof allowPublicComments === 'boolean') settings.allowPublicComments = allowPublicComments;
     if (typeof allowRegistrations === 'boolean') settings.allowRegistrations = allowRegistrations;
+    if (typeof adsEnabled === 'boolean') settings.adsEnabled = adsEnabled;
 
     if (Array.isArray(prohibitedWords)) settings.prohibitedWords = prohibitedWords;
     if (maxPostsPerDay) settings.maxPostsPerDay = maxPostsPerDay;

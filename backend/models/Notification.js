@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema(
         'EVENT',
         'WARNING',
         'SPONSORSHIP',
+        'ADVERTISING',
       ],
       required: true,
     },

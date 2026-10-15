@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../services/api';
 import { Reveal } from '../components/ui/motion';
+import AdSlot from '../components/ads/AdSlot';
 import { MapPin, Clock, Users, ArrowRight, Sparkles, CalendarX2, CalendarDays, Ban } from 'lucide-react';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=70';
@@ -295,6 +296,8 @@ const Events = () => {
       </header>
 
       <div className="container-page pt-10 space-y-10">
+        {/* Sponsored card at the top of the list (nothing when no ad is served) */}
+        <AdSlot placement="events.list" layout="wide" />
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Loading events">
             {[1, 2, 3].map((n) => (

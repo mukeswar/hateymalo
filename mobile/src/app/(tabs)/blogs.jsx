@@ -6,6 +6,7 @@ import API from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { colors, space } from '../../theme';
 import { T, Button, Card, ChipBar, Divider, Field, Row, Screen, Skeleton } from '../../components/ui';
+import { AdCreative, interleaveAds, useAds } from '../../components/ads/AdSlot';
 import { BLOG_FILTERS, BlogCover, Byline, Pill, Stats, plain } from '../../components/blogs/BlogBits';
 
 // Port of frontend/src/pages/Blogs.jsx
@@ -107,6 +108,9 @@ export default function BlogsScreen() {
   // Lead with a featured story when there is one, otherwise the newest story.
   const lead = blogs.find((b) => b.isFeatured) || blogs[0];
   const rest = lead ? blogs.filter((b) => b._id !== lead._id) : [];
+  // Sponsored cards after every 6th story (feed.inline), matched to the active cause.
+  const { ads: feedAds, placement: feedPlacement } = useAds('feed.inline', { category: category === 'All' ? '' : category });
+  const rows = interleaveAds(rest, feedAds, 6);
 
   const header = (
     <View style={{ gap: space.lg }}>
@@ -181,9 +185,9 @@ export default function BlogsScreen() {
   return (
     <Screen scroll={false}>
       <FlatList
-        data={loading ? [] : rest}
+        data={loading ? [] : rows}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => <StoryCard blog={item} />}
+        renderItem={({ item }) => (item.__ad ? <AdCreative ad={item.__ad} placementInfo={feedPlacement} /> : <StoryCard blog={item} />)}
         ListHeaderComponent={header}
         ListHeaderComponentStyle={{ marginBottom: space.lg }}
         ListEmptyComponent={empty}

@@ -43,6 +43,7 @@ const getIcon = (type) => {
     case 'EVENT': return { Icon: Megaphone, tone: TONES.marigold };
     case 'WARNING': return { Icon: AlertTriangle, tone: TONES.marigold };
     case 'SPONSORSHIP': return { Icon: Handshake, tone: TONES.pine };
+    case 'ADVERTISING': return { Icon: Megaphone, tone: TONES.brand };
     default: return { Icon: Bell, tone: TONES.plain };
   }
 };
@@ -67,12 +68,17 @@ const mapWebLink = (link) => {
   if (m && OBJECT_ID.test(m[1])) return `/sponsor/portal/account/${m[1]}`;
   m = path.match(/^\/sponsor\/opportunities\/([^/]+)$/);
   if (m && OBJECT_ID.test(m[1])) return `/sponsor/${m[1]}`;
+  if (path === '/sponsor/ads') return '/sponsor/ads';
+  m = path.match(/^\/sponsor\/ads\/([^/]+)$/);
+  if (m && OBJECT_ID.test(m[1])) return `/sponsor/ads/${m[1]}`;
   m = path.match(/^\/organize\/([^/]+)$/);
   if (m && OBJECT_ID.test(m[1])) return `/sponsor/organize/${m[1]}`;
   if (path === '/admin' || path === '/admin-dashboard') {
     if (params.tab === 'sponsorDeals') return params.deal && OBJECT_ID.test(params.deal) ? `/admin/sponsorDeals?deal=${params.deal}` : '/admin/sponsorDeals';
     if (params.tab === 'sponsors') return '/admin/sponsors';
     if (params.tab === 'sponsorship') return '/admin/sponsorship';
+    if (params.tab === 'ads') return params.campaign && OBJECT_ID.test(params.campaign) ? `/admin/ads?campaign=${params.campaign}` : '/admin/ads';
+    if (params.tab === 'adPlacements') return '/admin/adPlacements';
     return null;
   }
   return null;
