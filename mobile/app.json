@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hateymalo",
     "slug": "hateymalo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#FBF7F0",
         "foregroundImage": "./assets/logo.png"
-      }
+      },
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/logo-mark.png",
